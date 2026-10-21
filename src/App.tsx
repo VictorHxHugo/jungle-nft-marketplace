@@ -421,7 +421,16 @@ function App() {
 
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b0b10]/95 backdrop-blur">
         <div className="mx-auto flex h-20 max-w-7xl items-center gap-6 px-5 lg:px-8">
-          <Link to="/" className="flex shrink-0 items-center gap-2">
+          <Link
+            to="/"
+            search={{
+              q: "",
+              category: "Todos",
+              sort: "featured",
+              page: 1,
+            }}
+            className="flex shrink-0 items-center gap-2"
+          >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500">
               <Sparkles className="h-5 w-5 text-white" />
             </span>
