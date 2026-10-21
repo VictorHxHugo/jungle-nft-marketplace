@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   ShoppingBag,
@@ -25,12 +25,55 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
+function getStoredIds(key: string): number[] {
+  try {
+    const stored = localStorage.getItem(key);
+
+    if (!stored) return [];
+
+    const parsed: unknown = JSON.parse(stored);
+
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === "number" && Number.isFinite(item))
+    ) {
+      return [...new Set(parsed)];
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 function App() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Todos");
   const [sort, setSort] = useState("featured");
-  const [favorites, setFavorites] = useState<number[]>([]);
-  const [cart, setCart] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<number[]>(() =>
+    getStoredIds("nova-art-favorites"),
+  );
+
+  const [cart, setCart] = useState<number[]>(() =>
+    getStoredIds("nova-art-cart"),
+  );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("nova-art-favorites", JSON.stringify(favorites));
+    } catch {
+      console.error("Não foi possível salvar os favoritos.");
+    }
+  }, [favorites]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("nova-art-cart", JSON.stringify(cart));
+    } catch {
+      console.error("Não foi possível salvar o carrinho.");
+    }
+  }, [cart]);
+
   const [cartOpen, setCartOpen] = useState(false);
 
   const {
