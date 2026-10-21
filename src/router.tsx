@@ -5,6 +5,7 @@ import {
   Outlet,
 } from "@tanstack/react-router";
 import App from "./App";
+import NFTDetails from "./pages/NFTDetails";
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -25,7 +26,13 @@ const indexRoute = createRoute({
   component: App,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute]);
+const nftDetailsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/nft/$nftId",
+  component: NFTDetails,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, nftDetailsRoute]);
 
 export const router = createRouter({
   routeTree,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { CartItem } from "@/types/cart";
 import { Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, Heart, ShoppingCart } from "lucide-react";
 import { getNFTById } from "@/services/nfts";
@@ -25,6 +26,55 @@ function getStoredIds(key: string): number[] {
   }
 }
 
+function getStoredCart(): CartItem[] {
+  try {
+    const stored = localStorage.getItem("nova-art-cart");
+    if (!stored) return [];
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+
+    const items: CartItem[] = [];
+
+    for (const item of parsed) {
+      if (typeof item === "number" && Number.isFinite(item)) {
+        const existing = items.find((cartItem) => cartItem.id === item);
+
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          items.push({ id: item, quantity: 1 });
+        }
+      } else if (
+        typeof item === "object" &&
+        item !== null &&
+        "id" in item &&
+        "quantity" in item &&
+        typeof item.id === "number" &&
+        Number.isFinite(item.id) &&
+        typeof item.quantity === "number" &&
+        Number.isInteger(item.quantity) &&
+        item.quantity > 0
+      ) {
+        const existing = items.find((cartItem) => cartItem.id === item.id);
+
+        if (existing) {
+          existing.quantity += item.quantity;
+        } else {
+          items.push({
+            id: item.id,
+            quantity: item.quantity,
+          });
+        }
+      }
+    }
+
+    return items;
+  } catch {
+    return [];
+  }
+}
+
 export default function NFTDetails() {
   const { nftId } = useParams({ from: "/nft/$nftId" });
   const id = Number(nftId);
@@ -33,9 +83,7 @@ export default function NFTDetails() {
     getStoredIds("nova-art-favorites"),
   );
 
-  const [cart, setCart] = useState<number[]>(() =>
-    getStoredIds("nova-art-cart"),
-  );
+  const [cart, setCart] = useState<CartItem[]>(getStoredCart);
 
   useEffect(() => {
     try {
@@ -71,7 +119,8 @@ export default function NFTDetails() {
   };
 
   const isFavorite = favorites.includes(id);
-  const isInCart = cart.includes(id);
+  const cartItem = cart.find((item) => item.id === id);
+  const isInCart = Boolean(cartItem);
 
   function toggleFavorite() {
     setFavorites((current) =>
@@ -82,7 +131,17 @@ export default function NFTDetails() {
   }
 
   function addToCart() {
-    setCart((current) => (current.includes(id) ? current : [...current, id]));
+    setCart((current) => {
+      const existing = current.find((item) => item.id === id);
+
+      if (existing) {
+        return current.map((item) =>
+          item.id === id ? { ...item, quantity: item.quantity + 1 } : item,
+        );
+      }
+
+      return [...current, { id, quantity: 1 }];
+    });
   }
 
   if (!Number.isInteger(id) || id <= 0) {
@@ -162,10 +221,11 @@ export default function NFTDetails() {
               type="button"
               className="flex-1 gap-2 bg-violet-500 text-white hover:bg-violet-600 disabled:bg-white/10 disabled:text-zinc-400"
               onClick={addToCart}
-              disabled={isInCart}
             >
               <ShoppingCart className="h-4 w-4" />
-              {isInCart ? "Adicionado ao carrinho" : "Adicionar ao carrinho"}
+              {isInCart
+                ? `Adicionar mais (${cartItem?.quantity ?? 0})`
+                : "Adicionar ao carrinho"}
             </Button>
 
             <Button
