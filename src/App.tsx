@@ -273,12 +273,12 @@ function App() {
               Explore criações digitais, descubra novos artistas e encontre
               peças para sua próxima coleção.
             </p>
-            <Button
-              asChild
-              className="mt-8 bg-violet-500 text-white hover:bg-violet-600"
-            >
-              <a href="#explore">Explorar marketplace</a>
-            </Button>
+           <a
+  href="#explore"
+  className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-600"
+>
+  Explorar marketplace
+</a>
           </div>
         </section>
 
