@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import type { CartItem } from "@/types/cart";
 import {
   Search,
@@ -15,7 +16,6 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { getNFTs } from "@/services/nfts";
 import { categories } from "@/mocks/nfts";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,7 @@ function getStoredCart(): CartItem[] {
 
 function App() {
   const navigate = useNavigate({ from: "/" });
+
   const {
     q: search,
     category,
@@ -306,14 +307,29 @@ function App() {
                     key={nft.id}
                     className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
                   >
-                    <img
-                      src={nft.image}
-                      alt={nft.name}
-                      className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                    />
+                    <Link
+                      to="/nft/$nftId"
+                      params={{ nftId: String(nft.id) }}
+                      aria-label={`Ver detalhes de ${nft.name}`}
+                      className="shrink-0"
+                      onClick={() => setCartOpen(false)}
+                    >
+                      <img
+                        src={nft.image}
+                        alt={nft.name}
+                        className="h-16 w-16 rounded-lg object-cover transition hover:opacity-80"
+                      />
+                    </Link>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{nft.name}</p>
+                      <Link
+                        to="/nft/$nftId"
+                        params={{ nftId: String(nft.id) }}
+                        className="block truncate font-medium transition hover:text-violet-300"
+                        onClick={() => setCartOpen(false)}
+                      >
+                        {nft.name}
+                      </Link>
 
                       <p className="mt-1 truncate text-xs text-zinc-400">
                         {nft.collection}
@@ -405,7 +421,7 @@ function App() {
 
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b0b10]/95 backdrop-blur">
         <div className="mx-auto flex h-20 max-w-7xl items-center gap-6 px-5 lg:px-8">
-          <a href="/" className="flex shrink-0 items-center gap-2">
+          <Link to="/" className="flex shrink-0 items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500">
               <Sparkles className="h-5 w-5 text-white" />
             </span>
@@ -413,7 +429,7 @@ function App() {
             <span className="text-xl font-bold tracking-tight">
               nova<span className="text-violet-400">.art</span>
             </span>
-          </a>
+          </Link>
 
           <nav className="hidden items-center gap-6 text-sm text-zinc-400 md:flex">
             <a
@@ -693,12 +709,19 @@ function App() {
                     className="group overflow-hidden rounded-2xl border border-white/10 bg-[#121219] transition duration-300 hover:-translate-y-1 hover:border-violet-400/40"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
-                      <img
-                        src={nft.image}
-                        alt={nft.name}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      />
+                      <Link
+                        to="/nft/$nftId"
+                        params={{ nftId: String(nft.id) }}
+                        aria-label={`Ver detalhes de ${nft.name}`}
+                        className="block h-full w-full"
+                      >
+                        <img
+                          src={nft.image}
+                          alt={nft.name}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+                      </Link>
 
                       <button
                         type="button"
@@ -709,7 +732,7 @@ function App() {
                             : `Adicionar ${nft.name} aos favoritos`
                         }
                         aria-pressed={favorites.includes(nft.id)}
-                        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/50 backdrop-blur transition hover:bg-black/80"
+                        className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/50 backdrop-blur transition hover:bg-black/80"
                       >
                         <Heart
                           className={`h-5 w-5 ${
@@ -720,7 +743,7 @@ function App() {
                         />
                       </button>
 
-                      <Badge className="absolute left-3 top-3 border border-white/10 bg-black/50 text-white backdrop-blur">
+                      <Badge className="pointer-events-none absolute left-3 top-3 border border-white/10 bg-black/50 text-white backdrop-blur">
                         {nft.category}
                       </Badge>
                     </div>
@@ -728,7 +751,15 @@ function App() {
                     <div className="p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <h3 className="truncate font-semibold">{nft.name}</h3>
+                          <h3 className="truncate font-semibold">
+                            <Link
+                              to="/nft/$nftId"
+                              params={{ nftId: String(nft.id) }}
+                              className="transition hover:text-violet-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                            >
+                              {nft.name}
+                            </Link>
+                          </h3>
 
                           <p className="mt-1 truncate text-sm text-zinc-400">
                             {nft.collection}
