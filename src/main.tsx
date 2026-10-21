@@ -17,7 +17,10 @@ const queryClient = new QueryClient({
 });
 
 async function enableMocking() {
-  if (import.meta.env.DEV) {
+  const shouldEnableMocks =
+    import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCKS === "true";
+
+  if (shouldEnableMocks) {
     await worker.start();
   }
 }
