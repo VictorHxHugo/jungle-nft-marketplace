@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   Search,
   ShoppingBag,
@@ -28,7 +29,6 @@ import {
 function getStoredIds(key: string): number[] {
   try {
     const stored = localStorage.getItem(key);
-
     if (!stored) return [];
 
     const parsed: unknown = JSON.parse(stored);
@@ -47,16 +47,16 @@ function getStoredIds(key: string): number[] {
 }
 
 function App() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("Todos");
-  const [sort, setSort] = useState("featured");
+  const navigate = useNavigate({ from: "/" });
+  const { q: search, category, sort, page } = useSearch({ from: "/" });
+
   const [favorites, setFavorites] = useState<number[]>(() =>
     getStoredIds("nova-art-favorites"),
   );
-
   const [cart, setCart] = useState<number[]>(() =>
     getStoredIds("nova-art-cart"),
   );
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -74,7 +74,43 @@ function App() {
     }
   }, [cart]);
 
-  const [cartOpen, setCartOpen] = useState(false);
+  function updateSearch(value: string) {
+    void navigate({
+      search: (previous) => ({ ...previous, q: value, page: 1 }),
+      replace: true,
+    });
+  }
+
+  function updateCategory(value: string) {
+    void navigate({
+      search: (previous) => ({
+        ...previous,
+        category: value,
+        page: 1,
+      }),
+      replace: true,
+    });
+  }
+
+  function updateSort(value: "featured" | "low" | "high") {
+    void navigate({
+      search: (previous) => ({ ...previous, sort: value, page: 1 }),
+      replace: true,
+    });
+  }
+
+  function clearFilters() {
+    void navigate({
+      search: (previous) => ({
+        ...previous,
+        q: "",
+        category: "Todos",
+        sort: "featured",
+        page: 1,
+      }),
+      replace: true,
+    });
+  }
 
   const {
     data: nfts = [],
@@ -91,7 +127,7 @@ function App() {
     .filter((nft) => {
       const matchesSearch = `${nft.name} ${nft.collection}`
         .toLowerCase()
-        .includes(search.toLowerCase());
+        .includes(search.trim().toLowerCase());
 
       const matchesCategory = category === "Todos" || nft.category === category;
 
@@ -102,6 +138,16 @@ function App() {
       if (sort === "high") return b.price - a.price;
       return a.id - b.id;
     });
+
+  const pageSize = 3;
+  const totalPages = Math.max(1, Math.ceil(filteredNFTs.length / pageSize));
+
+  const currentPage = Math.max(1, page);
+
+  const paginatedNFTs = filteredNFTs.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   const cartNFTs = cart
     .map((id) => nfts.find((nft) => nft.id === id))
@@ -226,7 +272,7 @@ function App() {
 
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b0b10]/95 backdrop-blur">
         <div className="mx-auto flex h-20 max-w-7xl items-center gap-6 px-5 lg:px-8">
-          <a href="#" className="flex shrink-0 items-center gap-2">
+          <a href="/" className="flex shrink-0 items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500">
               <Sparkles className="h-5 w-5 text-white" />
             </span>
@@ -255,7 +301,7 @@ function App() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
               <Input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => updateSearch(event.target.value)}
                 placeholder="Buscar NFTs ou coleções..."
                 aria-label="Buscar NFTs ou coleções"
                 className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-zinc-500"
@@ -313,7 +359,7 @@ function App() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
             <Input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => updateSearch(event.target.value)}
               placeholder="Buscar NFTs ou coleções..."
               aria-label="Buscar NFTs ou coleções"
               className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-zinc-500"
@@ -366,10 +412,10 @@ function App() {
                 variant="outline"
                 className="border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
                 onClick={() =>
-                  setSort((current) =>
-                    current === "low"
+                  updateSort(
+                    sort === "low"
                       ? "high"
-                      : current === "high"
+                      : sort === "high"
                         ? "featured"
                         : "low",
                   )
@@ -386,10 +432,7 @@ function App() {
               <Button
                 variant="outline"
                 className="border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
-                onClick={() => {
-                  setCategory("Todos");
-                  setSort("featured");
-                }}
+                onClick={clearFilters}
               >
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
                 Limpar filtros
@@ -403,7 +446,7 @@ function App() {
                 key={item}
                 size="sm"
                 variant={category === item ? "default" : "outline"}
-                onClick={() => setCategory(item)}
+                onClick={() => updateCategory(item)}
                 className={
                   category === item
                     ? "bg-violet-500 text-white hover:bg-violet-600"
@@ -483,90 +526,137 @@ function App() {
               <Button
                 variant="outline"
                 className="mt-5 border-white/15"
-                onClick={() => {
-                  setSearch("");
-                  setCategory("Todos");
-                }}
+                onClick={clearFilters}
               >
                 Limpar busca
               </Button>
             </div>
           ) : (
-            <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-              {filteredNFTs.map((nft) => (
-                <article
-                  key={nft.id}
-                  className="group overflow-hidden rounded-2xl border border-white/10 bg-[#121219] transition duration-300 hover:-translate-y-1 hover:border-violet-400/40"
-                >
-                  <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
-                    <img
-                      src={`https://images.unsplash.com/${nft.image}?auto=format&fit=crop&w=900&q=85`}
-                      alt={nft.name}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleFavorite(nft.id)}
-                      aria-label={
-                        favorites.includes(nft.id)
-                          ? `Remover ${nft.name} dos favoritos`
-                          : `Adicionar ${nft.name} aos favoritos`
-                      }
-                      aria-pressed={favorites.includes(nft.id)}
-                      className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/50 backdrop-blur transition hover:bg-black/80"
-                    >
-                      <Heart
-                        className={`h-5 w-5 ${
-                          favorites.includes(nft.id)
-                            ? "fill-rose-500 text-rose-500"
-                            : "text-white"
-                        }`}
+            <>
+              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+                {paginatedNFTs.map((nft) => (
+                  <article
+                    key={nft.id}
+                    className="group overflow-hidden rounded-2xl border border-white/10 bg-[#121219] transition duration-300 hover:-translate-y-1 hover:border-violet-400/40"
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
+                      <img
+                        src={`https://images.unsplash.com/${nft.image}?auto=format&fit=crop&w=900&q=85`}
+                        alt={nft.name}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       />
-                    </button>
 
-                    <Badge className="absolute left-3 top-3 border border-white/10 bg-black/50 text-white backdrop-blur">
-                      {nft.category}
-                    </Badge>
-                  </div>
-
-                  <div className="p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate font-semibold">{nft.name}</h3>
-                        <p className="mt-1 truncate text-sm text-zinc-400">
-                          {nft.collection}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1 text-sm text-zinc-400">
-                        <Heart className="h-3.5 w-3.5" />
-                        {nft.likes + (favorites.includes(nft.id) ? 1 : 0)}
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
-                      <div>
-                        <p className="text-xs text-zinc-500">Preço atual</p>
-                        <p className="mt-1 text-lg font-bold">
-                          {nft.price.toFixed(2)}{" "}
-                          <span className="text-sm font-medium text-violet-300">
-                            ETH
-                          </span>
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => addToCart(nft.id)}
-                        disabled={cart.includes(nft.id)}
-                        className="bg-violet-500 text-white hover:bg-violet-600 disabled:bg-white/10 disabled:text-zinc-400"
+                      <button
+                        type="button"
+                        onClick={() => toggleFavorite(nft.id)}
+                        aria-label={
+                          favorites.includes(nft.id)
+                            ? `Remover ${nft.name} dos favoritos`
+                            : `Adicionar ${nft.name} aos favoritos`
+                        }
+                        aria-pressed={favorites.includes(nft.id)}
+                        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/50 backdrop-blur transition hover:bg-black/80"
                       >
-                        {cart.includes(nft.id) ? "Adicionado" : "Adicionar"}
-                      </Button>
+                        <Heart
+                          className={`h-5 w-5 ${
+                            favorites.includes(nft.id)
+                              ? "fill-rose-500 text-rose-500"
+                              : "text-white"
+                          }`}
+                        />
+                      </button>
+
+                      <Badge className="absolute left-3 top-3 border border-white/10 bg-black/50 text-white backdrop-blur">
+                        {nft.category}
+                      </Badge>
                     </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate font-semibold">{nft.name}</h3>
+                          <p className="mt-1 truncate text-sm text-zinc-400">
+                            {nft.collection}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1 text-sm text-zinc-400">
+                          <Heart className="h-3.5 w-3.5" />
+                          {nft.likes + (favorites.includes(nft.id) ? 1 : 0)}
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
+                        <div>
+                          <p className="text-xs text-zinc-500">Preço atual</p>
+                          <p className="mt-1 text-lg font-bold">
+                            {nft.price.toFixed(2)}{" "}
+                            <span className="text-sm font-medium text-violet-300">
+                              ETH
+                            </span>
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => addToCart(nft.id)}
+                          disabled={cart.includes(nft.id)}
+                          className="bg-violet-500 text-white hover:bg-violet-600 disabled:bg-white/10 disabled:text-zinc-400"
+                        >
+                          {cart.includes(nft.id) ? "Adicionado" : "Adicionar"}
+                        </Button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <nav
+                  aria-label="Paginação do catálogo"
+                  className="mt-8 flex items-center justify-center gap-4"
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={currentPage === 1}
+                    className="border-white/15"
+                    onClick={() =>
+                      void navigate({
+                        search: (previous) => ({
+                          ...previous,
+                          page: currentPage - 1,
+                        }),
+                        replace: true,
+                      })
+                    }
+                  >
+                    Anterior
+                  </Button>
+
+                  <span className="text-sm text-zinc-400" aria-live="polite">
+                    Página {currentPage} de {totalPages}
+                  </span>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={currentPage === totalPages}
+                    className="border-white/15"
+                    onClick={() =>
+                      void navigate({
+                        search: (previous) => ({
+                          ...previous,
+                          page: currentPage + 1,
+                        }),
+                        replace: true,
+                      })
+                    }
+                  >
+                    Próxima
+                  </Button>
+                </nav>
+              )}
+            </>
           )}
         </section>
       </main>
