@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from "react";
 import {
   Search,
   ShoppingBag,
@@ -10,66 +10,76 @@ import {
   Menu,
   Trash2,
   ShoppingCart,
-} from 'lucide-react'
-import { nfts, categories } from '@/mocks/nfts'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getNFTs } from "@/services/nfts";
+import { categories } from "@/mocks/nfts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 
 function App() {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('Todos')
-  const [sort, setSort] = useState('featured')
-  const [favorites, setFavorites] = useState<number[]>([])
-  const [cart, setCart] = useState<number[]>([])
-  const [cartOpen, setCartOpen] = useState(false)
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("Todos");
+  const [sort, setSort] = useState("featured");
+  const [favorites, setFavorites] = useState<number[]>([]);
+  const [cart, setCart] = useState<number[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
+
+  const {
+    data: nfts = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["nfts"],
+    queryFn: getNFTs,
+  });
 
   const filteredNFTs = nfts
     .filter((nft) => {
       const matchesSearch = `${nft.name} ${nft.collection}`
         .toLowerCase()
-        .includes(search.toLowerCase())
+        .includes(search.toLowerCase());
 
-      const matchesCategory =
-        category === 'Todos' || nft.category === category
+      const matchesCategory = category === "Todos" || nft.category === category;
 
-      return matchesSearch && matchesCategory
+      return matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
-      if (sort === 'low') return a.price - b.price
-      if (sort === 'high') return b.price - a.price
-      return a.id - b.id
-    })
+      if (sort === "low") return a.price - b.price;
+      if (sort === "high") return b.price - a.price;
+      return a.id - b.id;
+    });
 
   const cartNFTs = cart
     .map((id) => nfts.find((nft) => nft.id === id))
-    .filter((nft) => nft !== undefined)
+    .filter((nft) => nft !== undefined);
 
-  const cartTotal = cartNFTs.reduce((total, nft) => total + nft.price, 0)
+  const cartTotal = cartNFTs.reduce((total, nft) => total + nft.price, 0);
 
   function toggleFavorite(id: number) {
     setFavorites((current) =>
       current.includes(id)
         ? current.filter((item) => item !== id)
         : [...current, id],
-    )
+    );
   }
 
   function addToCart(id: number) {
-    setCart((current) =>
-      current.includes(id) ? current : [...current, id],
-    )
+    setCart((current) => (current.includes(id) ? current : [...current, id]));
   }
 
   function removeFromCart(id: number) {
-    setCart((current) => current.filter((item) => item !== id))
+    setCart((current) => current.filter((item) => item !== id));
   }
 
   return (
@@ -83,7 +93,7 @@ function App() {
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
               {cartNFTs.length === 1
-                ? 'Você adicionou 1 NFT ao carrinho.'
+                ? "Você adicionou 1 NFT ao carrinho."
                 : `Você adicionou ${cartNFTs.length} NFTs ao carrinho.`}
             </DialogDescription>
           </DialogHeader>
@@ -144,23 +154,23 @@ function App() {
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">Total estimado</span>
                   <span className="text-xl font-bold">
-                    {cartTotal.toFixed(2)}{' '}
+                    {cartTotal.toFixed(2)}{" "}
                     <span className="text-sm text-violet-300">ETH</span>
                   </span>
                 </div>
 
                 <p className="mt-2 text-xs text-zinc-500">
-                  O valor é uma estimativa baseada nos preços exibidos. Taxas
-                  de rede e pagamento ainda não estão incluídas.
+                  O valor é uma estimativa baseada nos preços exibidos. Taxas de
+                  rede e pagamento ainda não estão incluídas.
                 </p>
 
                 <Button
                   className="mt-5 w-full bg-violet-500 text-white hover:bg-violet-600"
                   onClick={() => {
-                    setCartOpen(false)
+                    setCartOpen(false);
                     window.alert(
-                      'O checkout será implementado na próxima etapa.',
-                    )
+                      "O checkout será implementado na próxima etapa.",
+                    );
                   }}
                 >
                   Continuar comprando
@@ -226,7 +236,15 @@ function App() {
             )}
           </Button>
 
-          <Button className="hidden bg-violet-500 text-white hover:bg-violet-600 sm:inline-flex">
+          <Button
+            type="button"
+            className="hidden bg-violet-500 text-white hover:bg-violet-600 sm:inline-flex"
+            onClick={() =>
+              window.alert(
+                "A conexão com a carteira será implementada na próxima etapa.",
+              )
+            }
+          >
             <Wallet className="mr-2 h-4 w-4" />
             Conectar carteira
           </Button>
@@ -236,7 +254,12 @@ function App() {
             variant="ghost"
             size="icon"
             className="md:hidden"
-            aria-label="Menu"
+            aria-label="Ir para o catálogo"
+            onClick={() =>
+              document.getElementById("explore")?.scrollIntoView({
+                behavior: "smooth",
+              })
+            }
           >
             <Menu className="h-5 w-5" />
           </Button>
@@ -261,8 +284,7 @@ function App() {
           <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl" />
           <div className="relative max-w-2xl">
             <Badge className="mb-6 border border-violet-300/20 bg-violet-400/10 text-violet-200">
-              <Sparkles className="mr-1 h-3 w-3" />
-              O futuro da arte digital
+              <Sparkles className="mr-1 h-3 w-3" />O futuro da arte digital
             </Badge>
             <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
               Arte única.
@@ -273,12 +295,12 @@ function App() {
               Explore criações digitais, descubra novos artistas e encontre
               peças para sua próxima coleção.
             </p>
-           <a
-  href="#explore"
-  className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-600"
->
-  Explorar marketplace
-</a>
+            <a
+              href="#explore"
+              className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-violet-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-600"
+            >
+              Explorar marketplace
+            </a>
           </div>
         </section>
 
@@ -302,28 +324,28 @@ function App() {
                 className="border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
                 onClick={() =>
                   setSort((current) =>
-                    current === 'low'
-                      ? 'high'
-                      : current === 'high'
-                        ? 'featured'
-                        : 'low',
+                    current === "low"
+                      ? "high"
+                      : current === "high"
+                        ? "featured"
+                        : "low",
                   )
                 }
               >
                 <ArrowUpDown className="mr-2 h-4 w-4" />
-                {sort === 'low'
-                  ? 'Menor preço'
-                  : sort === 'high'
-                    ? 'Maior preço'
-                    : 'Ordenar preço'}
+                {sort === "low"
+                  ? "Menor preço"
+                  : sort === "high"
+                    ? "Maior preço"
+                    : "Ordenar preço"}
               </Button>
 
               <Button
                 variant="outline"
                 className="border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
                 onClick={() => {
-                  setCategory('Todos')
-                  setSort('featured')
+                  setCategory("Todos");
+                  setSort("featured");
                 }}
               >
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
@@ -337,12 +359,12 @@ function App() {
               <Button
                 key={item}
                 size="sm"
-                variant={category === item ? 'default' : 'outline'}
+                variant={category === item ? "default" : "outline"}
                 onClick={() => setCategory(item)}
                 className={
                   category === item
-                    ? 'bg-violet-500 text-white hover:bg-violet-600'
-                    : 'border-white/10 bg-transparent text-zinc-300 hover:bg-white/10 hover:text-white'
+                    ? "bg-violet-500 text-white hover:bg-violet-600"
+                    : "border-white/10 bg-transparent text-zinc-300 hover:bg-white/10 hover:text-white"
                 }
               >
                 {item}
@@ -351,23 +373,76 @@ function App() {
           </div>
 
           <div className="mt-6 flex items-center justify-between text-sm text-zinc-400">
-            <span>{filteredNFTs.length} itens encontrados</span>
+            <span>
+              {isLoading
+                ? "Carregando catálogo..."
+                : isError
+                  ? "Não foi possível carregar os NFTs"
+                  : `${filteredNFTs.length} itens encontrados`}
+            </span>
             <span className="hidden sm:inline">Preços em ETH</span>
           </div>
 
-          {filteredNFTs.length === 0 ? (
+          {isLoading ? (
+            <div
+              className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
+              aria-label="Carregando NFTs"
+              aria-busy="true"
+            >
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-[#121219]"
+                >
+                  <div className="aspect-[4/3] animate-pulse bg-white/10" />
+                  <div className="space-y-3 p-5">
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-white/10" />
+                    <div className="h-10 animate-pulse rounded bg-white/10" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : isError ? (
+            <div
+              role="alert"
+              className="mt-8 rounded-2xl border border-rose-400/20 bg-rose-400/5 px-6 py-16 text-center"
+            >
+              <h3 className="font-semibold text-rose-300">
+                Não foi possível carregar o catálogo
+              </h3>
+              <p className="mx-auto mt-2 max-w-lg text-sm text-zinc-400">
+                {error instanceof Error
+                  ? error.message
+                  : "Ocorreu um erro inesperado ao buscar os NFTs."}
+              </p>
+              <Button
+                type="button"
+                className="mt-5 bg-violet-500 text-white hover:bg-violet-600"
+                onClick={() => refetch()}
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          ) : filteredNFTs.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-dashed border-white/15 px-6 py-16 text-center">
               <Search className="mx-auto h-8 w-8 text-zinc-500" />
-              <h3 className="mt-4 font-semibold">Nenhum NFT encontrado</h3>
+              <h3 className="mt-4 font-semibold">
+                {nfts.length === 0
+                  ? "Nenhum NFT disponível"
+                  : "Nenhum NFT encontrado"}
+              </h3>
               <p className="mt-2 text-sm text-zinc-400">
-                Tente outra busca ou selecione uma categoria diferente.
+                {nfts.length === 0
+                  ? "O catálogo ainda não possui itens disponíveis."
+                  : "Tente outra busca ou selecione uma categoria diferente."}
               </p>
               <Button
                 variant="outline"
                 className="mt-5 border-white/15"
                 onClick={() => {
-                  setSearch('')
-                  setCategory('Todos')
+                  setSearch("");
+                  setCategory("Todos");
                 }}
               >
                 Limpar busca
@@ -401,8 +476,8 @@ function App() {
                       <Heart
                         className={`h-5 w-5 ${
                           favorites.includes(nft.id)
-                            ? 'fill-rose-500 text-rose-500'
-                            : 'text-white'
+                            ? "fill-rose-500 text-rose-500"
+                            : "text-white"
                         }`}
                       />
                     </button>
@@ -430,7 +505,7 @@ function App() {
                       <div>
                         <p className="text-xs text-zinc-500">Preço atual</p>
                         <p className="mt-1 text-lg font-bold">
-                          {nft.price.toFixed(2)}{' '}
+                          {nft.price.toFixed(2)}{" "}
                           <span className="text-sm font-medium text-violet-300">
                             ETH
                           </span>
@@ -442,7 +517,7 @@ function App() {
                         disabled={cart.includes(nft.id)}
                         className="bg-violet-500 text-white hover:bg-violet-600 disabled:bg-white/10 disabled:text-zinc-400"
                       >
-                        {cart.includes(nft.id) ? 'Adicionado' : 'Adicionar'}
+                        {cart.includes(nft.id) ? "Adicionado" : "Adicionar"}
                       </Button>
                     </div>
                   </div>
@@ -456,14 +531,14 @@ function App() {
       <footer className="mt-16 border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
           <p>
-            <span className="font-semibold text-white">nova.art</span> — conceito
-            inicial do marketplace NFT.
+            <span className="font-semibold text-white">nova.art</span> —
+            conceito inicial do marketplace NFT.
           </p>
           <p>Projeto de desafio técnico · React + TypeScript</p>
         </div>
       </footer>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
