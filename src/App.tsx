@@ -210,7 +210,7 @@ function App() {
                     className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
                   >
                     <img
-                      src={`https://images.unsplash.com/${nft.image}?auto=format&fit=crop&w=160&q=80`}
+                      src={nft.image}
                       alt={nft.name}
                       className="h-16 w-16 shrink-0 rounded-lg object-cover"
                     />
@@ -541,7 +541,7 @@ function App() {
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
                       <img
-                        src={`https://images.unsplash.com/${nft.image}?auto=format&fit=crop&w=900&q=85`}
+                        src={nft.image}
                         alt={nft.name}
                         loading="lazy"
                         className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
