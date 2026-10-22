@@ -290,6 +290,8 @@ export const handlers = [
       : 1;
     const pageSize = 3;
 
+    const minPrice = Number(url.searchParams.get("minPrice"));
+    const maxPrice = Number(url.searchParams.get("maxPrice"));
     const filtered = nfts
       .filter((nft) => {
         const matchesSearch = `${nft.name} ${nft.collection}`
@@ -298,7 +300,12 @@ export const handlers = [
         const matchesCategory =
           category === "Todos" || nft.category === category;
 
-        return matchesSearch && matchesCategory;
+        const matchesMinPrice =
+          !url.searchParams.has("minPrice") || nft.price >= minPrice;
+        const matchesMaxPrice =
+          !url.searchParams.has("maxPrice") || nft.price <= maxPrice;
+
+        return matchesSearch && matchesCategory && matchesMinPrice && matchesMaxPrice;
       })
       .sort((a, b) => {
         if (sort === "low") return a.price - b.price;
@@ -399,7 +406,7 @@ export const handlers = [
         .toFixed(2),
     );
 
-    const serviceFee = Number((subtotal * 0.025).toFixed(4));
+    const serviceFee = Number((subtotal * 0.0006).toFixed(4));
     const total = Number((subtotal + serviceFee).toFixed(4));
 
     if (

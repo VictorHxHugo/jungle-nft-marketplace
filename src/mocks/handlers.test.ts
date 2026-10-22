@@ -1,4 +1,4 @@
-﻿import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { setupServer } from "msw/node";
 import { handlers } from "./handlers";
 import { nfts } from "./nfts";
@@ -24,7 +24,7 @@ function createPayload(
 ): CreateOrderPayload {
   const nft = nfts[0];
   const subtotal = Number((nft.price * quantity).toFixed(2));
-  const serviceFee = Number((subtotal * 0.025).toFixed(4));
+  const serviceFee = Number((subtotal * 0.0006).toFixed(4));
 
   return {
     items: [{ nftId: nft.id, quantity }],
@@ -50,7 +50,7 @@ async function getOrderByKey(key: string) {
 }
 
 describe("Handlers MSW", () => {
-  it("retorna o NFT Cosmic Dreamer pelo ID 1", async () => {
+  it("retorna o NFT Emerald Ape #042 pelo ID 1", async () => {
     const response = await fetch("http://localhost/api/nfts/1");
 
     expect(response.status).toBe(200);
@@ -58,7 +58,7 @@ describe("Handlers MSW", () => {
     const nft = await response.json();
 
     expect(nft.id).toBe(1);
-    expect(nft.name).toBe("Cosmic Dreamer");
+    expect(nft.name).toBe("Emerald Ape #042");
   });
 
   it("retorna a lista de NFTs", async () => {

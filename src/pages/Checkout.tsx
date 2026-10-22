@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   LoaderCircle,
+  Mail,
   ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { useRealtime } from "@/providers/useRealtime";
 import { getSessionOwnerId } from "@/utils/session";
 import type { CartItem } from "@/types/cart";
 import type { Order } from "@/types/order";
+import { Breadcrumbs, SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
 const CART_STORAGE_KEY = "nova-art-cart";
 const IDEMPOTENCY_STORAGE_KEY = "nova-art-checkout-idempotency";
@@ -155,7 +157,7 @@ function Checkout() {
     items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2),
   );
 
-  const serviceFee = Number((subtotal * 0.025).toFixed(4));
+  const serviceFee = Number((subtotal * 0.0006).toFixed(4));
   const total = Number((subtotal + serviceFee).toFixed(4));
 
   useEffect(() => {
@@ -387,12 +389,15 @@ function Checkout() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0b0b10] px-5 py-10 text-white">
-      <div className="mx-auto max-w-3xl">
+    <div className="min-h-screen bg-[#150d09] text-[#f3eee9]">
+      <SiteHeader />
+      <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
+      <Breadcrumbs current="Pagamento" />
+      <div className="mx-auto max-w-7xl">
         <Link
           to="/"
           search={catalogSearch}
-          className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
+          className="inline-flex items-center gap-2 text-sm text-[#bda17e] hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Voltar ao catálogo
@@ -400,52 +405,41 @@ function Checkout() {
 
         <h1 className="mt-6 text-3xl font-bold">Finalizar compra</h1>
 
-        <p className="mt-2 text-zinc-400">
+        <p className="mt-2 text-[#bda17e]">
           Revise seu pedido antes de confirmar.
         </p>
 
         {order ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#150d09] px-4 py-5">
           <section
             role="status"
-            className="mt-8 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-6"
+            className="my-auto max-h-[95vh] w-full max-w-[580px] overflow-y-auto border-b-4 border-[#d88d4b] bg-[#271711]"
           >
-            <CheckCircle2 className="h-10 w-10 text-emerald-400" />
-
-            <h2 className="mt-4 text-xl font-semibold">
-              {order.status === "confirmed"
-                ? "Pedido confirmado!"
-                : order.status === "pending"
-                  ? "Pedido pendente"
-                  : "Pedido recusado"}
-            </h2>
-
-            <p className="mt-2 text-zinc-300">
-              Número do pedido: <strong>{order.id}</strong>
-            </p>
-
-            <p className="mt-2 text-zinc-400">
-              Total: {order.total.toFixed(4)} ETH
-            </p>
-
-            <p className="mt-3 text-sm text-zinc-500">
-              Confirmação simulada para fins de demonstração. Nenhum pagamento
-              real foi realizado.
-            </p>
-
-            <Button
-              type="button"
-              className="mt-6 bg-violet-500 text-white hover:bg-violet-600"
-              onClick={() =>
-                window.location.assign(
-                  "/?q=&category=Todos&sort=featured&page=1",
-                )
-              }
-            >
-              Voltar ao marketplace
-            </Button>
+            <div className="border-b border-[#d88d4b] px-6 py-8 text-center sm:px-10">
+              {order.status === "confirmed" ? <Mail className="mx-auto h-16 w-16 text-[#d88d4b]" strokeWidth={1.5}/> : <CheckCircle2 className="mx-auto h-12 w-12 text-amber-400"/>}
+              <h2 className="mt-4 text-2xl font-bold text-[#c8aa84]">
+                {order.status === "confirmed" ? "Pedido confirmado!" : order.status === "pending" ? "Pedido pendente" : "Pedido recusado"}
+              </h2>
+              {order.status === "confirmed" && <p className="mt-2 font-semibold text-[#c8aa84]">Seu pedido foi registrado com sucesso</p>}
+            </div>
+            <div className="grid gap-4 border-b border-[#d88d4b] px-6 py-5 text-sm text-[#c8aa84] sm:grid-cols-4 sm:px-10">
+              <p><span className="block font-bold">ID do pedido</span><strong className="block max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap">{order.id}</strong></p>
+              <p><span className="block font-bold">Data</span>{new Date(order.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replaceAll(" de ", " ")}</p>
+              <p><span className="block font-bold">Total</span>Total: {order.total.toFixed(4)} ETH</p>
+              <p><span className="block font-bold">Status</span>{order.status === "confirmed" ? "Confirmado" : order.status === "pending" ? "Pendente" : "Recusado"}</p>
+            </div>
+            <div className="px-6 py-6 sm:px-10">
+              <h3 className="mb-4 text-lg font-bold">Detalhes da transação</h3>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] border-b border-[#5a3825] pb-3 text-left font-bold"><span>NFTs</span><span className="px-5">Edições</span><span>Subtotal</span></div>
+              <div className="divide-y divide-[#4a2d20]">{order.items.map((orderItem) => { const nft = nfts.find(({ id }) => id === orderItem.nftId); return <div key={orderItem.nftId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-3 text-left"><div className="flex min-w-0 items-center gap-3">{nft && <img src={nft.image} alt="" className="h-14 w-14 rounded-lg object-cover"/>}<div className="min-w-0"><p className="truncate font-bold">{nft?.name ?? `NFT #${orderItem.nftId}`}</p>{nft && <p className="text-sm text-[#bda17e]">ID do token: #{nft.name.match(/#(\d+)/)?.[1]?.padStart(4, "0") ?? String(nft.id).padStart(4, "0")}</p>}</div></div><span className="px-5 text-[#c8aa84]">(x {orderItem.quantity})</span><span className="whitespace-nowrap font-bold text-[#ed9a50]">{((nft?.price ?? 0) * orderItem.quantity).toFixed(2)} ETH</span></div>; })}</div>
+              <div className="ml-auto mt-4 max-w-sm space-y-2 border-b border-[#5a3825] pb-4 text-right"><p className="flex justify-between"><span>Taxa de rede</span><span>{order.serviceFee.toFixed(3)} ETH</span></p><p className="flex justify-between text-lg font-bold"><span>Total</span><span className="text-[#ed9a50]">{order.total.toFixed(3)} ETH</span></p></div>
+              <p className="mx-auto mt-5 max-w-2xl text-center text-sm leading-6 text-[#c8aa84]">{order.status === "confirmed" ? "Transação confirmada pelo sistema de demonstração. Nenhum pagamento real foi realizado e os ativos não foram transferidos em uma blockchain." : order.status === "pending" ? "O pedido ainda aguarda confirmação. Nenhum pagamento ou transferência é apresentado como concluído." : "O pedido não foi confirmado. Nenhum pagamento ou transferência foi concluído."}</p>
+              <Button type="button" className="mt-6 bg-[#d88d4b] font-bold text-[#1a100b] hover:bg-[#e49b5d]" onClick={() => window.location.assign("/?q=&category=Todos&sort=featured&page=1")}>Voltar ao marketplace</Button>
+            </div>
           </section>
+          </div>
         ) : recovering || isLoading ? (
-          <p className="mt-8 text-zinc-400">
+          <p className="mt-8 text-[#bda17e]">
             Verificando pedido e carregando preços...
           </p>
         ) : isError ? (
@@ -454,19 +448,19 @@ function Checkout() {
           </p>
         ) : items.length === 0 ? (
           <section className="mt-8 rounded-2xl border border-white/10 p-8 text-center">
-            <ShoppingBag className="mx-auto h-10 w-10 text-zinc-500" />
+            <ShoppingBag className="mx-auto h-10 w-10 text-[#a89070]" />
 
             <h2 className="mt-4 text-lg font-semibold">
               Seu carrinho está vazio
             </h2>
 
-            <p className="mt-2 text-sm text-zinc-400">
+            <p className="mt-2 text-sm text-[#bda17e]">
               Adicione um NFT ao carrinho antes de finalizar a compra.
             </p>
 
             <Button
               type="button"
-              className="mt-5 bg-violet-500 text-white hover:bg-violet-600"
+              className="mt-5 bg-[#d88d4b] text-white hover:bg-[#e49b5d]"
               onClick={() =>
                 window.location.assign(
                   "/?q=&category=Todos&sort=featured&page=1",
@@ -477,14 +471,23 @@ function Checkout() {
             </Button>
           </section>
         ) : (
-          <section className="mt-8 rounded-2xl border border-white/10 bg-[#121219] p-5 sm:p-7">
-            <h2 className="text-lg font-semibold">Resumo do pedido</h2>
+          <div className="mt-8 grid items-start gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(380px,.8fr)]">
+          <section className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+            <h2 className="md:col-span-2 text-2xl font-bold">Perfil do colecionador</h2>
+            {["Nome de exibição", "Nome de usuário", "Rede", "Nome do perfil", "Endereço da carteira", "ENS ou carteira secundária (opcional)", "Tipo de carteira", "Código de indicação", "E-mail", "Nome ENS"].map((label) => <label key={label} className="block"><span className="mb-2 block">{label}{!["ENS ou carteira secundária (opcional)", "Código de indicação"].includes(label) && <span className="text-[#e98661]">*</span>}</span>{["Rede", "Tipo de carteira", "Nome ENS"].includes(label) ? <select aria-label={label} className="h-12 w-full rounded border border-[#4a2d20] bg-[#150d09] px-4 text-[#bda17e]"><option>{label === "Rede" ? "Selecione uma rede" : label === "Tipo de carteira" ? "Selecione uma carteira" : ".eth"}</option>{(label === "Rede" ? ["Ethereum", "Polygon", "Solana"] : label === "Tipo de carteira" ? ["MetaMask", "WalletConnect", "Coinbase Wallet"] : []).map((option) => <option key={option}>{option}</option>)}</select> : <input aria-label={label} placeholder={label === "Endereço da carteira" ? "Endereço 0x da carteira" : ""} className="h-12 w-full rounded border border-[#4a2d20] bg-transparent px-4 outline-none focus:border-[#d88d4b]"/>}</label>)}
+            <label className="md:col-span-2 flex items-center gap-3"><input type="checkbox" className="accent-[#d88d4b]"/> Usar outra carteira?</label>
+            <label className="md:col-span-2">Observação do colecionador (opcional)<textarea className="mt-2 min-h-28 w-full rounded border border-[#4a2d20] bg-transparent p-3"/></label>
+          </section>
+
+          <section className="border border-[#4a2d20] bg-[#271711] p-5 sm:p-7">
+            <h2 className="text-2xl font-semibold">Seus NFTs</h2>
+            <h3 className="mt-5 border-b border-[#5a3825] pb-3 font-bold">NFTs <span className="float-right">Subtotal</span></h3>
 
             <div className="mt-5 space-y-4">
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-4 border-b border-white/10 pb-4"
+                  className="flex items-center gap-4 border-b border-white/10 bg-[#21140f] p-2 pb-4"
                 >
                   <img
                     src={item.image}
@@ -495,7 +498,7 @@ function Checkout() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{item.name}</p>
 
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-[#bda17e]">
                       Quantidade: {item.quantity}
                     </p>
                   </div>
@@ -508,18 +511,23 @@ function Checkout() {
             </div>
 
             <div className="mt-5 space-y-3 text-sm">
-              <div className="flex justify-between gap-4 text-zinc-400">
+              <div className="flex justify-between gap-4 text-[#bda17e]">
                 <span>Subtotal</span>
                 <span>{subtotal.toFixed(2)} ETH</span>
               </div>
 
-              <div className="flex justify-between gap-4 text-zinc-400">
-                <span>Taxa de serviço (2,5%)</span>
+              <div className="flex justify-between gap-4 text-[#bda17e]">
+                <span>Desconto do lançamento</span>
+                <span>(−) 00.00</span>
+              </div>
+
+              <div className="flex justify-between gap-4 text-[#bda17e]">
+                <span>Taxa de rede</span>
                 <span>{serviceFee.toFixed(4)} ETH</span>
               </div>
 
               <div className="flex justify-between gap-4 border-t border-white/10 pt-4 text-lg font-bold">
-                <span>Total estimado</span>
+                <span>Total</span>
                 <span>{total.toFixed(4)} ETH</span>
               </div>
             </div>
@@ -554,13 +562,17 @@ function Checkout() {
               </div>
             )}
 
+            <h3 className="mt-7 text-xl font-bold">Carteira e rede</h3>
+            <div className="mt-4 space-y-3">{["MetaMask", "WalletConnect", "Coinbase Wallet"].map((wallet) => <label key={wallet} className="flex items-center gap-3 border border-[#4a2d20] p-4"><input type="radio" name="wallet" className="accent-[#d88d4b]"/>{wallet}</label>)}</div>
+
             <Button
               type="button"
               onClick={confirmPurchase}
               disabled={
                 processing || recovering || quoteNeedsReview || hasUnavailableItems
               }
-              className="mt-6 w-full bg-violet-500 text-white hover:bg-violet-600"
+              aria-label="Confirmar compra simulada"
+              className="mt-6 w-full bg-[#d88d4b] text-[#1a100b] hover:bg-[#e49b5d]"
             >
               {processing ? (
                 <>
@@ -570,17 +582,20 @@ function Checkout() {
               ) : recovering ? (
                 "Verificando pedido..."
               ) : (
-                "Confirmar compra simulada"
+                "Confirmar compra"
               )}
             </Button>
 
-            <p className="mt-3 text-center text-xs text-zinc-500">
+            <p className="mt-3 text-center text-xs text-[#a89070]">
               Ambiente de demonstração. Nenhum pagamento real será cobrado.
             </p>
           </section>
+          </div>
         )}
       </div>
-    </main>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
 

@@ -14,7 +14,7 @@ test("conclui uma compra simulada e limpa o carrinho", async ({ page }) => {
   await page.getByRole("button", { name: /carrinho|shopping bag/i }).click();
 
   await expect(
-    page.getByRole("link", { name: "Cosmic Dreamer", exact: true }).first(),
+    page.getByRole("link", { name: "Emerald Ape #042", exact: true }).first(),
   ).toBeVisible();
 
   await page.getByRole("button", { name: /finalizar compra/i }).click();
@@ -24,7 +24,7 @@ test("conclui uma compra simulada e limpa o carrinho", async ({ page }) => {
   ).toBeVisible();
 
   await expect(
-    page.locator("section").getByText("0.85 ETH", { exact: true }).first(),
+    page.locator("section").getByText("1.19 ETH", { exact: true }).first(),
   ).toBeVisible();
 
   await page

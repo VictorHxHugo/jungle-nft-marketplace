@@ -284,16 +284,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         aria-atomic="true"
         className="fixed bottom-4 right-4 z-[100] max-w-sm space-y-2"
       >
-        <p
-          role="status"
-          className="rounded-full border border-white/10 bg-[#121219]/95 px-3 py-1.5 text-xs text-zinc-300 shadow-lg"
-        >
-          {connectionStatus === "connected"
-            ? "Atualizações em tempo real conectadas"
-            : "Reconectando atualizações em tempo real…"}
+        <p role="status" className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0">
+          {connectionStatus === "connected" ? "Atualizações em tempo real conectadas" : "Reconectando atualizações em tempo real…"}
         </p>
         {notice && (
-          <p className="rounded-xl border border-violet-400/20 bg-[#1b1030]/95 px-4 py-3 text-sm text-white shadow-lg">
+          <p className="rounded-xl border border-violet-400/20 bg-[#261610]/95 px-4 py-3 text-sm text-white shadow-lg">
             {notice}
           </p>
         )}

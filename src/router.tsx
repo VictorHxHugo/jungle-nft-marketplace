@@ -8,6 +8,8 @@ import App from "./App";
 import NFTDetails from "./pages/NFTDetails";
 import Checkout from "./pages/Checkout";
 import AuthPage from "./pages/AuthPage";
+import CartPage from "./pages/CartPage";
+import AccountPage from "./pages/AccountPage";
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -52,12 +54,33 @@ const registerRoute = createRoute({
   component: () => <AuthPage mode="register" />,
 });
 
+const cartRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cart",
+  component: CartPage,
+});
+
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile",
+  component: () => <AccountPage tab="profile" />,
+});
+
+const walletsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/wallets",
+  component: () => <AccountPage tab="wallets" />,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   nftDetailsRoute,
   checkoutRoute,
   loginRoute,
   registerRoute,
+  cartRoute,
+  profileRoute,
+  walletsRoute,
 ]);
 
 export const router = createRouter({

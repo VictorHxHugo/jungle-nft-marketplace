@@ -35,7 +35,7 @@ test("nft.updated atualiza catálogo, carrinho e detalhes e ignora versão antig
   ).toBeVisible();
 
   const cosmicCard = page.locator("article").filter({
-    has: page.getByRole("link", { name: "Cosmic Dreamer", exact: true }),
+    has: page.getByRole("link", { name: "Emerald Ape #042", exact: true }),
   });
   await cosmicCard.getByRole("button", { name: "Adicionar", exact: true }).click();
 
@@ -59,9 +59,9 @@ test("nft.updated atualiza catálogo, carrinho e detalhes e ignora versão antig
   ).toBeVisible();
 
   await cartDialog
-    .getByRole("link", { name: "Cosmic Dreamer", exact: true })
+    .getByRole("link", { name: "Emerald Ape #042", exact: true })
     .click();
-  await expect(page.getByRole("heading", { name: "Cosmic Dreamer" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Emerald Ape #042" })).toBeVisible();
   await expect(page.locator("main")).toContainText("0.90 ETH");
 });
 
@@ -70,7 +70,7 @@ test("mudança de disponibilidade bloqueia adicionar e checkout sem apagar o car
 }) => {
   await page.goto("/");
   const cosmicCard = page.locator("article").filter({
-    has: page.getByRole("link", { name: "Cosmic Dreamer", exact: true }),
+    has: page.getByRole("link", { name: "Emerald Ape #042", exact: true }),
   });
   await cosmicCard.getByRole("button", { name: "Adicionar", exact: true }).click();
 
@@ -85,7 +85,7 @@ test("mudança de disponibilidade bloqueia adicionar e checkout sem apagar o car
   ).toBeVisible();
 
   await expect(
-    cosmicCard.getByRole("button", { name: "Cosmic Dreamer indisponível" }),
+    cosmicCard.getByRole("button", { name: "Emerald Ape #042 indisponível" }),
   ).toBeDisabled();
   await page.getByRole("button", { name: /^Carrinho,/ }).click();
   const cartDialog = page.getByRole("dialog");
@@ -115,13 +115,13 @@ test("checkout bloqueia cotação desatualizada até o usuário revisar o novo t
   expect(result.status).toBe(202);
   await expect(page.getByText(/Revise a nova cotação antes de confirmar/)).toBeVisible();
   await expect(confirm).toBeDisabled();
-  await expect(page.locator("section")).toContainText("0.90 ETH");
+  await expect(page.getByRole("heading", { name: "Seus NFTs" }).locator("..")).toContainText("0.90 ETH");
 
   await page.getByRole("button", { name: "Revisar cotação atualizada" }).click();
   await expect(confirm).toBeEnabled();
   await confirm.click();
   await expect(page.getByRole("heading", { name: "Pedido confirmado!" })).toBeVisible();
-  await expect(page.getByText("Total: 0.9225 ETH")).toBeVisible();
+  await expect(page.getByText("Total: 0.9005 ETH")).toBeVisible();
 });
 
 test("order.updated reconcilia o pedido por REST e descarta versão antiga", async ({

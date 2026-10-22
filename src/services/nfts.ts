@@ -8,6 +8,8 @@ export interface NFTCatalogParams {
   category: string;
   sort: NFTSort;
   page: number;
+  minPrice?: number;
+  maxPrice?: number;
 }
 
 export interface NFTCatalogResponse {
@@ -38,6 +40,8 @@ export async function getNFTCatalog(
       category: params.category,
       sort: params.sort,
       page: params.page,
+      ...(params.minPrice !== undefined ? { minPrice: params.minPrice } : {}),
+      ...(params.maxPrice !== undefined ? { maxPrice: params.maxPrice } : {}),
     },
   });
 

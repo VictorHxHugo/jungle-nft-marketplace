@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import axios from "axios";
 import { login, register } from "@/services/auth";
+import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 
 type AuthPageProps = {
   mode: "login" | "register";
@@ -54,8 +55,23 @@ export default function AuthPage({ mode }: AuthPageProps) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#10091f] px-4 py-10 text-white">
-      <section className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1b1030] p-7 shadow-2xl sm:p-9">
+    <main className="min-h-screen bg-[#150d09] text-white">
+      <SiteHeader hideLogin />
+      <div className="relative isolate flex min-h-[680px] items-center justify-center overflow-hidden px-4 py-12">
+        <div className="absolute inset-0 -z-10 grid items-center gap-10 px-6 opacity-70 lg:grid-cols-2 lg:px-16">
+          <div className="max-w-xl py-10">
+            <p className="mb-5 font-semibold tracking-[0.16em] text-[#e6d7c7]">Bem-vindo à Kurio</p>
+            <p className="text-4xl font-bold uppercase leading-tight sm:text-6xl">Seja dono do futuro da arte digital</p>
+            <p className="mt-5 text-[#bda17e]">Descubra NFTs selecionados de criadores e colecione arte digital verificada.</p>
+          </div>
+          <img src="/images/kurio-hero.webp" alt="Emerald Ape com óculos e jaqueta verde" className="mx-auto hidden aspect-square w-full max-w-[460px] rounded-3xl object-cover lg:block" />
+        </div>
+        <div className="absolute inset-0 -z-10 bg-[#150d09]/35" />
+      <section className="w-full max-w-[472px] border border-[#4a2d20] border-b-4 border-b-[#d88d4b] bg-[#261610] p-7 shadow-2xl sm:p-10">
+        <div className="mb-7 flex items-center justify-center gap-3 text-xl font-bold"><Link to="/login" className={!isRegister ? "text-[#df914a]" : "text-[#e9dfd4] hover:text-[#df914a]"}>Entrar</Link><span className="text-[#e98661]">|</span><Link to="/register" className={isRegister ? "text-[#df914a]" : "text-[#e9dfd4] hover:text-[#df914a]"}>Criar conta</Link></div>
+        <p className="mx-auto mb-7 max-w-md text-center text-sm text-[#d9c7b3]">
+          {isRegister ? "Crie sua conta para acompanhar sua coleção e seus criadores favoritos." : "Entre para gerenciar sua carteira, coleção e perfil de criador."}
+        </p>
         <Link
           to="/"
           search={{
@@ -64,19 +80,17 @@ export default function AuthPage({ mode }: AuthPageProps) {
             sort: "featured",
             page: 1,
           }}
-          className="mb-8 inline-block text-sm text-purple-300 transition hover:text-white"
+          className="mb-5 inline-block text-sm text-[#d88d4b] transition hover:text-white"
         >
           ← Voltar ao marketplace
         </Link>
 
         <h1 className="text-3xl font-bold tracking-tight">
-          {isRegister ? "Criar conta" : "Bem-vindo de volta"}
+          {isRegister ? "Criar conta" : "Entrar"}
         </h1>
 
         <p className="mt-2 text-sm text-white/60">
-          {isRegister
-            ? "Cadastre-se para continuar no Nova Art."
-            : "Entre na sua conta para continuar."}
+          {isRegister ? "Cadastre-se na Kurio para continuar." : "Acesse sua conta Kurio."}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -94,7 +108,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                 minLength={2}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="w-full rounded-lg border border-white/15 bg-black/20 px-4 py-3 outline-none transition placeholder:text-white/35 focus:border-purple-400"
+                className="w-full rounded-lg border border-white/15 bg-black/20 px-4 py-3 outline-none transition placeholder:text-white/35 focus:border-[#d88d4b]"
                 placeholder="Seu nome"
               />
             </div>
@@ -112,7 +126,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-lg border border-white/15 bg-black/20 px-4 py-3 outline-none transition placeholder:text-white/35 focus:border-purple-400"
+              className="w-full rounded-lg border border-white/15 bg-black/20 px-4 py-3 outline-none transition placeholder:text-white/35 focus:border-[#d88d4b]"
               placeholder="voce@exemplo.com"
             />
           </div>
@@ -133,7 +147,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
               minLength={isRegister ? 8 : undefined}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-lg border border-white/15 bg-black/20 px-4 py-3 outline-none transition placeholder:text-white/35 focus:border-purple-400"
+              className="w-full rounded-lg border border-white/15 bg-black/20 px-4 py-3 outline-none transition placeholder:text-white/35 focus:border-[#d88d4b]"
               placeholder={isRegister ? "Mínimo de 8 caracteres" : "Sua senha"}
             />
           </div>
@@ -150,7 +164,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-purple-600 px-4 py-3 font-semibold transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg bg-[#d88d4b] px-4 py-3 font-semibold transition hover:bg-[#e49b5d] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Aguarde..." : isRegister ? "Criar conta" : "Entrar"}
           </button>
@@ -160,12 +174,14 @@ export default function AuthPage({ mode }: AuthPageProps) {
           {isRegister ? "Já tem uma conta?" : "Ainda não tem uma conta?"}{" "}
           <Link
             to={isRegister ? "/login" : "/register"}
-            className="font-medium text-purple-300 hover:text-white"
+            className="font-medium text-[#d88d4b] hover:text-white"
           >
             {isRegister ? "Entrar" : "Cadastre-se"}
           </Link>
         </p>
       </section>
+      </div>
+      <SiteFooter />
     </main>
   );
 }
