@@ -1,8 +1,10 @@
+export type OrderItem = {
+  nftId: number;
+  quantity: number;
+};
+
 export type CreateOrderPayload = {
-  items: {
-    nftId: number;
-    quantity: number;
-  }[];
+  items: OrderItem[];
   subtotal: number;
   serviceFee: number;
   total: number;
@@ -11,8 +13,8 @@ export type CreateOrderPayload = {
 
 export type Order = {
   id: string;
-  status: "confirmed";
-  items: CreateOrderPayload["items"];
+  status: "pending" | "confirmed" | "declined";
+  items: OrderItem[];
   subtotal: number;
   serviceFee: number;
   total: number;

@@ -7,7 +7,59 @@ type ProcessedOrder = {
   order: Order;
 };
 
+const STORAGE_KEY = "nova-art-processed-orders";
 const processedOrders = new Map<string, ProcessedOrder>();
+
+function loadStoredOrders(): void {
+  if (typeof localStorage === "undefined") return;
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return;
+
+    for (const entry of parsed) {
+      if (
+        typeof entry !== "object" ||
+        entry === null ||
+        !("key" in entry) ||
+        !("payload" in entry) ||
+        !("order" in entry) ||
+        typeof entry.key !== "string" ||
+        !entry.key
+      ) {
+        continue;
+      }
+
+      processedOrders.set(entry.key, {
+        payload: entry.payload as CreateOrderPayload,
+        order: entry.order as Order,
+      });
+    }
+  } catch {
+    // Ignora dados locais inválidos sem impedir a inicialização.
+  }
+}
+
+function persistOrders(): void {
+  if (typeof localStorage === "undefined") return;
+
+  try {
+    const entries = Array.from(processedOrders, ([key, value]) => ({
+      key,
+      payload: value.payload,
+      order: value.order,
+    }));
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // A persistência pode falhar se o armazenamento estiver indisponível.
+  }
+}
+
+loadStoredOrders();
 
 function normalizePayload(payload: CreateOrderPayload): CreateOrderPayload {
   return {
@@ -35,6 +87,20 @@ function hasSamePayload(
 }
 
 export const handlers = [
+  http.get("*/api/orders/by-idempotency-key/:key", ({ params }) => {
+    const key = String(params.key);
+    const existing = processedOrders.get(key);
+
+    if (!existing) {
+      return HttpResponse.json(
+        { message: "Pedido não encontrado." },
+        { status: 404 },
+      );
+    }
+
+    return HttpResponse.json(existing.order);
+  }),
+
   http.get("*/api/nfts", () => {
     return HttpResponse.json(nfts);
   }),
@@ -111,7 +177,6 @@ export const handlers = [
       payload.items
         .reduce((sum, item) => {
           const nft = nfts.find((current) => current.id === item.nftId)!;
-
           return sum + nft.price * item.quantity;
         }, 0)
         .toFixed(2),
@@ -147,6 +212,16 @@ export const handlers = [
       payload: normalizedPayload,
       order,
     });
+    persistOrders();
+
+    // Simula uma resposta perdida somente quando o teste solicita.
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("nova-art-test-lose-order-response") === "true"
+    ) {
+      localStorage.removeItem("nova-art-test-lose-order-response");
+      return Response.error();
+    }
 
     return HttpResponse.json(order, { status: 201 });
   }),

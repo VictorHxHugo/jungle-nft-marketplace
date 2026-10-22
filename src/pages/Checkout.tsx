@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,13 +9,16 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getNFTs } from "@/services/nfts";
-import { createOrder } from "@/services/orders";
+import { createOrder, getOrderByIdempotencyKey } from "@/services/orders";
 import type { CartItem } from "@/types/cart";
 import type { Order } from "@/types/order";
 
+const CART_STORAGE_KEY = "nova-art-cart";
+const IDEMPOTENCY_STORAGE_KEY = "nova-art-checkout-idempotency";
+
 function readCart(): CartItem[] {
   try {
-    const stored = localStorage.getItem("nova-art-cart");
+    const stored = localStorage.getItem(CART_STORAGE_KEY);
     if (!stored) return [];
 
     const parsed: unknown = JSON.parse(stored);
@@ -25,23 +28,26 @@ function readCart(): CartItem[] {
 
     for (const item of parsed) {
       if (
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        "quantity" in item &&
-        typeof item.id === "number" &&
-        Number.isInteger(item.id) &&
-        typeof item.quantity === "number" &&
-        Number.isInteger(item.quantity) &&
-        item.quantity > 0
+        typeof item !== "object" ||
+        item === null ||
+        !("id" in item) ||
+        !("quantity" in item) ||
+        typeof item.id !== "number" ||
+        !Number.isSafeInteger(item.id) ||
+        item.id <= 0 ||
+        typeof item.quantity !== "number" ||
+        !Number.isSafeInteger(item.quantity) ||
+        item.quantity <= 0
       ) {
-        const existing = items.find((current) => current.id === item.id);
+        continue;
+      }
 
-        if (existing) {
-          existing.quantity += item.quantity;
-        } else {
-          items.push({ id: item.id, quantity: item.quantity });
-        }
+      const existing = items.find((current) => current.id === item.id);
+
+      if (existing) {
+        existing.quantity += item.quantity;
+      } else {
+        items.push({ id: item.id, quantity: item.quantity });
       }
     }
 
@@ -51,12 +57,56 @@ function readCart(): CartItem[] {
   }
 }
 
+function getCartFingerprint(cart: CartItem[]): string {
+  return JSON.stringify(
+    [...cart]
+      .sort((a, b) => a.id - b.id)
+      .map(({ id, quantity }) => ({ id, quantity })),
+  );
+}
+
+function getOrCreateIdempotencyKey(cart: CartItem[]): string {
+  const fingerprint = getCartFingerprint(cart);
+
+  try {
+    const stored = localStorage.getItem(IDEMPOTENCY_STORAGE_KEY);
+
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored);
+
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "fingerprint" in parsed &&
+        "key" in parsed &&
+        parsed.fingerprint === fingerprint &&
+        typeof parsed.key === "string" &&
+        parsed.key.length > 0
+      ) {
+        return parsed.key;
+      }
+    }
+  } catch {
+    // Um registro inválido será substituído.
+  }
+
+  const key = crypto.randomUUID();
+
+  localStorage.setItem(
+    IDEMPOTENCY_STORAGE_KEY,
+    JSON.stringify({ fingerprint, key }),
+  );
+
+  return key;
+}
+
 function Checkout() {
   const [cart] = useState<CartItem[]>(readCart);
   const [order, setOrder] = useState<Order | null>(null);
   const [checkoutError, setCheckoutError] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [recovering, setRecovering] = useState(true);
+  const [idempotencyKey] = useState(() => getOrCreateIdempotencyKey(cart));
 
   const {
     data: nfts = [],
@@ -75,29 +125,76 @@ function Checkout() {
   const subtotal = Number(
     items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2),
   );
+
   const serviceFee = Number((subtotal * 0.025).toFixed(4));
   const total = Number((subtotal + serviceFee).toFixed(4));
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function recoverOrder() {
+      if (cart.length === 0) {
+        setRecovering(false);
+        return;
+      }
+
+      try {
+        const existingOrder = await getOrderByIdempotencyKey(idempotencyKey);
+
+        if (!cancelled && existingOrder) {
+          localStorage.setItem(CART_STORAGE_KEY, "[]");
+          localStorage.removeItem(IDEMPOTENCY_STORAGE_KEY);
+          setOrder(existingOrder);
+        }
+      } catch {
+        // A consulta pode falhar por rede ou indisponibilidade da API.
+        // A confirmação continuará disponível para uma nova tentativa.
+      } finally {
+        if (!cancelled) {
+          setRecovering(false);
+        }
+      }
+    }
+
+    void recoverOrder();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cart, idempotencyKey]);
+
   async function confirmPurchase() {
-    if (processing || items.length === 0) return;
+    if (processing || recovering || items.length === 0) return;
 
     setProcessing(true);
     setCheckoutError("");
 
     try {
-      const createdOrder = await createOrder({
-        items: items.map((item) => ({
-          nftId: item.id,
-          quantity: item.quantity,
-        })),
-        subtotal,
-        serviceFee,
-        total,
-        idempotencyKey,
-      });
+      let existingOrder: Order | null = null;
 
-      localStorage.setItem("nova-art-cart", "[]");
-      setOrder(createdOrder);
+      try {
+        existingOrder = await getOrderByIdempotencyKey(idempotencyKey);
+      } catch {
+        // Se a consulta falhar, a criação ainda poderá ser tentada.
+        // A API deve respeitar a chave de idempotência.
+      }
+
+      const confirmedOrder =
+        existingOrder ??
+        (await createOrder({
+          items: items.map((item) => ({
+            nftId: item.id,
+            quantity: item.quantity,
+          })),
+          subtotal,
+          serviceFee,
+          total,
+          idempotencyKey,
+        }));
+
+      localStorage.setItem(CART_STORAGE_KEY, "[]");
+      localStorage.removeItem(IDEMPOTENCY_STORAGE_KEY);
+      setOrder(confirmedOrder);
     } catch {
       setCheckoutError(
         "Não foi possível confirmar o pedido. Tente novamente; seu carrinho foi preservado.",
@@ -127,6 +224,7 @@ function Checkout() {
         </Link>
 
         <h1 className="mt-6 text-3xl font-bold">Finalizar compra</h1>
+
         <p className="mt-2 text-zinc-400">
           Revise seu pedido antes de confirmar.
         </p>
@@ -137,6 +235,7 @@ function Checkout() {
             className="mt-8 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-6"
           >
             <CheckCircle2 className="h-10 w-10 text-emerald-400" />
+
             <h2 className="mt-4 text-xl font-semibold">Pedido confirmado!</h2>
 
             <p className="mt-2 text-zinc-300">
@@ -164,8 +263,10 @@ function Checkout() {
               Voltar ao marketplace
             </Button>
           </section>
-        ) : isLoading ? (
-          <p className="mt-8 text-zinc-400">Carregando pedido...</p>
+        ) : recovering || isLoading ? (
+          <p className="mt-8 text-zinc-400">
+            Verificando pedido e carregando preços...
+          </p>
         ) : isError ? (
           <p role="alert" className="mt-8 text-rose-300">
             Não foi possível carregar os preços. Tente novamente mais tarde.
@@ -212,6 +313,7 @@ function Checkout() {
 
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{item.name}</p>
+
                     <p className="text-sm text-zinc-400">
                       Quantidade: {item.quantity}
                     </p>
@@ -250,7 +352,7 @@ function Checkout() {
             <Button
               type="button"
               onClick={confirmPurchase}
-              disabled={processing}
+              disabled={processing || recovering}
               className="mt-6 w-full bg-violet-500 text-white hover:bg-violet-600"
             >
               {processing ? (
@@ -258,6 +360,8 @@ function Checkout() {
                   <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                   Processando pedido...
                 </>
+              ) : recovering ? (
+                "Verificando pedido..."
               ) : (
                 "Confirmar compra simulada"
               )}

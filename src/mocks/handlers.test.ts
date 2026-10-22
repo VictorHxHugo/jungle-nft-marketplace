@@ -1,11 +1,4 @@
-﻿import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+﻿import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { setupServer } from "msw/node";
 import { handlers } from "./handlers";
 import { nfts } from "./nfts";
@@ -48,6 +41,12 @@ async function submitOrder(payload: CreateOrderPayload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+}
+
+async function getOrderByKey(key: string) {
+  return fetch(
+    `http://localhost/api/orders/by-idempotency-key/${encodeURIComponent(key)}`,
+  );
 }
 
 describe("Handlers MSW", () => {
@@ -137,5 +136,27 @@ describe("Handlers reais de pedidos", () => {
 
     expect(response.status).toBe(400);
     expect(error.message).toContain("inválidos");
+  });
+
+  it("recupera o pedido original pela chave de idempotência", async () => {
+    const key = crypto.randomUUID();
+    const payload = createPayload(key);
+
+    const createResponse = await submitOrder(payload);
+    const createdOrder = (await createResponse.json()) as Order;
+
+    const lookupResponse = await getOrderByKey(key);
+    const recoveredOrder = (await lookupResponse.json()) as Order;
+
+    expect(createResponse.status).toBe(201);
+    expect(lookupResponse.status).toBe(200);
+    expect(recoveredOrder).toEqual(createdOrder);
+    expect(recoveredOrder.id).toBe(createdOrder.id);
+  });
+
+  it("retorna 404 ao consultar uma chave inexistente", async () => {
+    const response = await getOrderByKey(crypto.randomUUID());
+
+    expect(response.status).toBe(404);
   });
 });
