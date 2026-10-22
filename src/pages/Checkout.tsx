@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -9,12 +9,19 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getNFTs } from "@/services/nfts";
-import { createOrder, getOrderByIdempotencyKey } from "@/services/orders";
+import {
+  createOrder,
+  getOrderById,
+  getOrderByIdempotencyKey,
+} from "@/services/orders";
+import { useRealtime } from "@/providers/useRealtime";
+import { getSessionOwnerId } from "@/utils/session";
 import type { CartItem } from "@/types/cart";
 import type { Order } from "@/types/order";
 
 const CART_STORAGE_KEY = "nova-art-cart";
 const IDEMPOTENCY_STORAGE_KEY = "nova-art-checkout-idempotency";
+const ORDER_POINTER_STORAGE_KEY = "nova-art-pending-order";
 
 function readCart(): CartItem[] {
   try {
@@ -65,11 +72,16 @@ function getCartFingerprint(cart: CartItem[]): string {
   );
 }
 
-function getOrCreateIdempotencyKey(cart: CartItem[]): string {
+function getSessionStorageKey(base: string, ownerId: string): string {
+  return `${base}:${ownerId}`;
+}
+
+function getOrCreateIdempotencyKey(cart: CartItem[], ownerId: string): string {
   const fingerprint = getCartFingerprint(cart);
+  const storageKey = getSessionStorageKey(IDEMPOTENCY_STORAGE_KEY, ownerId);
 
   try {
-    const stored = localStorage.getItem(IDEMPOTENCY_STORAGE_KEY);
+    const stored = localStorage.getItem(storageKey);
 
     if (stored) {
       const parsed: unknown = JSON.parse(stored);
@@ -93,7 +105,7 @@ function getOrCreateIdempotencyKey(cart: CartItem[]): string {
   const key = crypto.randomUUID();
 
   localStorage.setItem(
-    IDEMPOTENCY_STORAGE_KEY,
+    storageKey,
     JSON.stringify({ fingerprint, key }),
   );
 
@@ -101,17 +113,33 @@ function getOrCreateIdempotencyKey(cart: CartItem[]): string {
 }
 
 function Checkout() {
+  const queryClient = useQueryClient();
+  const { connectionStatus, subscribeNFTUpdates, subscribeOrderUpdates } =
+    useRealtime();
+  const ownerId = getSessionOwnerId();
+  const idempotencyStorageKey = getSessionStorageKey(
+    IDEMPOTENCY_STORAGE_KEY,
+    ownerId,
+  );
+  const pendingOrderStorageKey = getSessionStorageKey(
+    ORDER_POINTER_STORAGE_KEY,
+    ownerId,
+  );
   const [cart] = useState<CartItem[]>(readCart);
   const [order, setOrder] = useState<Order | null>(null);
   const [checkoutError, setCheckoutError] = useState("");
   const [processing, setProcessing] = useState(false);
   const [recovering, setRecovering] = useState(true);
-  const [idempotencyKey] = useState(() => getOrCreateIdempotencyKey(cart));
+  const [quoteNeedsReview, setQuoteNeedsReview] = useState(false);
+  const [idempotencyKey] = useState(() =>
+    getOrCreateIdempotencyKey(cart, ownerId),
+  );
 
   const {
     data: nfts = [],
     isLoading,
     isError,
+    refetch: refetchNFTs,
   } = useQuery({
     queryKey: ["nfts"],
     queryFn: getNFTs,
@@ -121,6 +149,7 @@ function Checkout() {
     const nft = nfts.find((current) => current.id === item.id);
     return nft ? [{ ...nft, quantity: item.quantity }] : [];
   });
+  const hasUnavailableItems = items.some((item) => item.available === false);
 
   const subtotal = Number(
     items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2),
@@ -133,17 +162,35 @@ function Checkout() {
     let cancelled = false;
 
     async function recoverOrder() {
-      if (cart.length === 0) {
-        setRecovering(false);
-        return;
-      }
-
       try {
+        const pendingOrderId = localStorage.getItem(pendingOrderStorageKey);
+        if (pendingOrderId) {
+          try {
+            const pendingOrder = await getOrderById(pendingOrderId);
+            if (!cancelled && pendingOrder.status === "pending") {
+              queryClient.setQueryData(["order", pendingOrder.id], pendingOrder);
+              setOrder(pendingOrder);
+              localStorage.setItem(CART_STORAGE_KEY, "[]");
+              return;
+            }
+            localStorage.removeItem(pendingOrderStorageKey);
+          } catch {
+            // Continue with idempotency-key recovery if this pointer is unavailable.
+          }
+        }
+
+        if (cart.length === 0) return;
         const existingOrder = await getOrderByIdempotencyKey(idempotencyKey);
 
         if (!cancelled && existingOrder) {
+          queryClient.setQueryData(["order", existingOrder.id], existingOrder);
+          if (existingOrder.status === "pending") {
+            localStorage.setItem(pendingOrderStorageKey, existingOrder.id);
+          } else {
+            localStorage.removeItem(pendingOrderStorageKey);
+          }
           localStorage.setItem(CART_STORAGE_KEY, "[]");
-          localStorage.removeItem(IDEMPOTENCY_STORAGE_KEY);
+          localStorage.removeItem(idempotencyStorageKey);
           setOrder(existingOrder);
         }
       } catch {
@@ -161,10 +208,122 @@ function Checkout() {
     return () => {
       cancelled = true;
     };
-  }, [cart, idempotencyKey]);
+  }, [
+    cart,
+    idempotencyKey,
+    idempotencyStorageKey,
+    pendingOrderStorageKey,
+    queryClient,
+  ]);
+
+  useEffect(
+    () =>
+      subscribeNFTUpdates((event) => {
+        if (cart.some((item) => item.id === event.nftId)) {
+          setQuoteNeedsReview(true);
+        }
+      }),
+    [cart, subscribeNFTUpdates],
+  );
+
+  useEffect(
+    () =>
+      subscribeOrderUpdates((event) => {
+        if (!order || event.orderId !== order.id) return;
+        void getOrderById(event.orderId)
+          .then((updatedOrder) => {
+            if (
+              updatedOrder.id === event.orderId &&
+              (updatedOrder.version ?? event.version) >= event.version
+            ) {
+              queryClient.setQueryData(["order", updatedOrder.id], updatedOrder);
+              setOrder((currentOrder) => {
+                if (
+                  currentOrder &&
+                  currentOrder.status !== "pending" &&
+                  currentOrder.status !== updatedOrder.status
+                ) {
+                  return currentOrder;
+                }
+                if (updatedOrder.status !== "pending") {
+                  localStorage.removeItem(pendingOrderStorageKey);
+                  localStorage.removeItem(idempotencyStorageKey);
+                }
+                return updatedOrder;
+              });
+            }
+          })
+          .catch(() => {
+            // O pedido é reconciliado novamente ao abrir o checkout.
+          });
+      }),
+    [
+      idempotencyStorageKey,
+      order,
+      pendingOrderStorageKey,
+      queryClient,
+      subscribeOrderUpdates,
+    ],
+  );
+
+  useEffect(() => {
+    const orderId = order?.id;
+    const orderStatus = order?.status;
+    if (!orderId || orderStatus !== "pending" || connectionStatus !== "connected") {
+      return;
+    }
+
+    void getOrderById(orderId)
+      .then((latestOrder) => {
+        if (latestOrder.id !== orderId) return;
+        queryClient.setQueryData(["order", latestOrder.id], latestOrder);
+        if (latestOrder.status !== "pending") {
+          localStorage.removeItem(pendingOrderStorageKey);
+          localStorage.removeItem(idempotencyStorageKey);
+        }
+        setOrder((currentOrder) =>
+          currentOrder?.id !== latestOrder.id ||
+          currentOrder.status !== "pending" &&
+            currentOrder.status !== latestOrder.status
+            ? currentOrder
+            : currentOrder.version === latestOrder.version &&
+                currentOrder.status === latestOrder.status
+              ? currentOrder
+              : latestOrder,
+        );
+      })
+      .catch(() => {
+        // A later reconnect or refresh retries REST reconciliation.
+      });
+  }, [
+    idempotencyStorageKey,
+    order?.id,
+    order?.status,
+    connectionStatus,
+    pendingOrderStorageKey,
+    queryClient,
+  ]);
+
+  async function reviewUpdatedQuote() {
+    const result = await refetchNFTs();
+    if (result.error) {
+      setCheckoutError("Não foi possível atualizar a cotação. Tente novamente.");
+      return;
+    }
+    setCheckoutError("");
+    setQuoteNeedsReview(false);
+  }
 
   async function confirmPurchase() {
-    if (processing || recovering || items.length === 0) return;
+    if (
+      processing ||
+      recovering ||
+      quoteNeedsReview ||
+      items.length === 0 ||
+      hasUnavailableItems
+    ) {
+      return;
+    }
 
     setProcessing(true);
     setCheckoutError("");
@@ -192,13 +351,29 @@ function Checkout() {
           idempotencyKey,
         }));
 
+      queryClient.setQueryData(["order", confirmedOrder.id], confirmedOrder);
+      if (confirmedOrder.status === "pending") {
+        localStorage.setItem(pendingOrderStorageKey, confirmedOrder.id);
+      } else {
+        localStorage.removeItem(pendingOrderStorageKey);
+        localStorage.removeItem(idempotencyStorageKey);
+      }
       localStorage.setItem(CART_STORAGE_KEY, "[]");
-      localStorage.removeItem(IDEMPOTENCY_STORAGE_KEY);
       setOrder(confirmedOrder);
-    } catch {
-      setCheckoutError(
-        "Não foi possível confirmar o pedido. Tente novamente; seu carrinho foi preservado.",
-      );
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "response" in error
+          ? (error.response as { status?: number } | undefined)?.status
+          : undefined;
+      if (status === 409) {
+        setQuoteNeedsReview(true);
+        await refetchNFTs();
+        setCheckoutError("A cotação mudou. Revise os novos valores antes de confirmar.");
+      } else {
+        setCheckoutError(
+          "Não foi possível confirmar o pedido. Tente novamente; seu carrinho foi preservado.",
+        );
+      }
     } finally {
       setProcessing(false);
     }
@@ -236,7 +411,13 @@ function Checkout() {
           >
             <CheckCircle2 className="h-10 w-10 text-emerald-400" />
 
-            <h2 className="mt-4 text-xl font-semibold">Pedido confirmado!</h2>
+            <h2 className="mt-4 text-xl font-semibold">
+              {order.status === "confirmed"
+                ? "Pedido confirmado!"
+                : order.status === "pending"
+                  ? "Pedido pendente"
+                  : "Pedido recusado"}
+            </h2>
 
             <p className="mt-2 text-zinc-300">
               Número do pedido: <strong>{order.id}</strong>
@@ -349,10 +530,36 @@ function Checkout() {
               </p>
             )}
 
+            {hasUnavailableItems && (
+              <p role="alert" className="mt-5 text-sm text-amber-300">
+                Remova os NFTs indisponíveis antes de confirmar o pedido.
+              </p>
+            )}
+
+            {quoteNeedsReview && (
+              <div
+                role="status"
+                className="mt-5 rounded-xl bg-amber-400/10 p-4 text-sm text-amber-200"
+              >
+                O preço ou a disponibilidade de um item mudou. Revise a nova
+                cotação antes de confirmar.
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => void reviewUpdatedQuote()}
+                >
+                  Revisar cotação atualizada
+                </Button>
+              </div>
+            )}
+
             <Button
               type="button"
               onClick={confirmPurchase}
-              disabled={processing || recovering}
+              disabled={
+                processing || recovering || quoteNeedsReview || hasUnavailableItems
+              }
               className="mt-6 w-full bg-violet-500 text-white hover:bg-violet-600"
             >
               {processing ? (

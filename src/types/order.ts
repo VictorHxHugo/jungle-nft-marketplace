@@ -19,4 +19,5 @@ export type Order = {
   serviceFee: number;
   total: number;
   createdAt: string;
+  version?: number;
 };

@@ -6,4 +6,6 @@ export type NFT = {
   image: string
   likes: number
   category: string
+  available?: boolean
+  version?: number
 }

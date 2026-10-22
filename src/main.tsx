@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { worker } from "./mocks/browser";
 import { router } from "./router";
+import { RealtimeProvider } from "./providers/RealtimeProvider";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -29,7 +30,9 @@ enableMocking().then(() => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <RealtimeProvider>
+          <RouterProvider router={router} />
+        </RealtimeProvider>
       </QueryClientProvider>
     </StrictMode>,
   );

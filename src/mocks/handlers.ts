@@ -1,10 +1,12 @@
 import { http, HttpResponse } from "msw";
 import { nfts } from "./nfts";
 import type { CreateOrderPayload, Order } from "@/types/order";
+import { broadcastSocketEvent, disconnectSocketClients } from "./socket";
 
 type ProcessedOrder = {
   payload: CreateOrderPayload;
   order: Order;
+  ownerId: string;
 };
 
 const STORAGE_KEY = "nova-art-processed-orders";
@@ -33,9 +35,17 @@ function loadStoredOrders(): void {
         continue;
       }
 
-      processedOrders.set(entry.key, {
+      const ownerId =
+        "ownerId" in entry && typeof entry.ownerId === "string"
+          ? entry.ownerId
+          : "anonymous";
+      const key = entry.key.startsWith(`${ownerId}:`)
+        ? entry.key
+        : getOrderStorageKey(ownerId, entry.key);
+      processedOrders.set(key, {
         payload: entry.payload as CreateOrderPayload,
         order: entry.order as Order,
+        ownerId,
       });
     }
   } catch {
@@ -51,6 +61,7 @@ function persistOrders(): void {
       key,
       payload: value.payload,
       order: value.order,
+      ownerId: value.ownerId,
     }));
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
@@ -87,17 +98,175 @@ function hasSamePayload(
 }
 
 export const handlers = [
-  http.get("*/api/orders/by-idempotency-key/:key", ({ params }) => {
-    const key = String(params.key);
-    const existing = processedOrders.get(key);
+  http.post("*/api/__mock/socket-events", async ({ request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json({ message: "Corpo inválido." }, { status: 400 });
+    }
 
-    if (!existing) {
+    if (!body || typeof body !== "object") {
+      return HttpResponse.json({ message: "Evento inválido." }, { status: 400 });
+    }
+
+    const value = body as Record<string, unknown>;
+    const replayStale = value.replayStale === true;
+    const replayDuplicate = value.replayDuplicate === true;
+
+    if (value.event === "socket.disconnect") {
+      disconnectSocketClients();
+      return HttpResponse.json({ disconnected: true }, { status: 202 });
+    }
+
+    if (value.event === "nft.updated") {
+      const nftId = value.nftId;
+      const changes = value.changes;
+      const nft =
+        typeof nftId === "number"
+          ? nfts.find((item) => item.id === nftId)
+          : undefined;
+      if (!nft || !changes || typeof changes !== "object") {
+        return HttpResponse.json({ message: "NFT ou alterações inválidas." }, { status: 400 });
+      }
+
+      const requested = changes as Record<string, unknown>;
+      const patch: { price?: number; available?: boolean } = {};
+      if ("price" in requested) {
+        if (
+          typeof requested.price !== "number" ||
+          !Number.isFinite(requested.price) ||
+          requested.price <= 0
+        ) {
+          return HttpResponse.json({ message: "Preço inválido." }, { status: 400 });
+        }
+        patch.price = requested.price;
+      }
+      if ("available" in requested) {
+        if (typeof requested.available !== "boolean") {
+          return HttpResponse.json({ message: "Disponibilidade inválida." }, { status: 400 });
+        }
+        patch.available = requested.available;
+      }
+      if (Object.keys(patch).length === 0) {
+        return HttpResponse.json({ message: "Nenhuma alteração informada." }, { status: 400 });
+      }
+
+      const eventNftId = nftId as number;
+      const previous = {
+        version: nft.version ?? 1,
+        changes: {
+          ...(patch.price !== undefined ? { price: nft.price } : {}),
+          ...(patch.available !== undefined
+            ? { available: nft.available ?? true }
+            : {}),
+        },
+      };
+      nft.version = previous.version + 1;
+      Object.assign(nft, patch);
+      const event = { nftId: eventNftId, version: nft.version, changes: patch };
+      broadcastSocketEvent("nft.updated", event);
+      if (replayDuplicate) broadcastSocketEvent("nft.updated", event);
+      if (replayStale) {
+        broadcastSocketEvent("nft.updated", {
+          nftId: eventNftId,
+          version: previous.version,
+          changes: previous.changes,
+        });
+      }
+      return HttpResponse.json(event, { status: 202 });
+    }
+
+    if (value.event === "order.updated") {
+      const orderId = value.orderId;
+      const changes = value.changes;
+      if (
+        typeof orderId !== "string" ||
+        !changes ||
+        typeof changes !== "object" ||
+        !("status" in changes) ||
+        !["pending", "confirmed", "declined"].includes(
+          String((changes as Record<string, unknown>).status),
+        )
+      ) {
+        return HttpResponse.json({ message: "Atualização de pedido inválida." }, { status: 400 });
+      }
+
+      const entry = Array.from(processedOrders.values()).find(
+        (processed) => processed.order.id === orderId,
+      );
+      const ownerId = request.headers.get("X-User-Id") ?? "anonymous";
+      if (!entry || entry.ownerId !== ownerId) {
+        return HttpResponse.json({ message: "Pedido não encontrado." }, { status: 404 });
+      }
+
+      const requestedStatus = (changes as { status: Order["status"] }).status;
+      if (
+        entry.order.status !== "pending" &&
+        entry.order.status !== requestedStatus
+      ) {
+        return HttpResponse.json(
+          { message: "O estado terminal do pedido não pode ser alterado." },
+          { status: 409 },
+        );
+      }
+
+      const previous = {
+        version: entry.order.version ?? 1,
+        status: entry.order.status,
+      };
+      if (previous.status !== requestedStatus) {
+        entry.order.version = previous.version + 1;
+        entry.order.status = requestedStatus;
+      }
+      persistOrders();
+      const event = {
+        orderId,
+        ownerId: entry.ownerId,
+        version: entry.order.version ?? 1,
+        changes: { status: entry.order.status },
+      };
+      broadcastSocketEvent("order.updated", event, entry.ownerId);
+      if (replayDuplicate) {
+        broadcastSocketEvent("order.updated", event, entry.ownerId);
+      }
+      if (replayStale) {
+        broadcastSocketEvent("order.updated", {
+          orderId,
+          version: previous.version,
+          changes: { status: previous.status },
+        });
+      }
+      return HttpResponse.json(event, { status: 202 });
+    }
+
+    return HttpResponse.json({ message: "Evento desconhecido." }, { status: 400 });
+  }),
+
+  http.get("*/api/orders/by-idempotency-key/:key", ({ params, request }) => {
+    const key = String(params.key);
+    const ownerId = requestOwnerId(request);
+    const existing = processedOrders.get(getOrderStorageKey(ownerId, key));
+
+    if (!existing || existing.ownerId !== ownerId) {
       return HttpResponse.json(
         { message: "Pedido não encontrado." },
         { status: 404 },
       );
     }
 
+    return HttpResponse.json(existing.order);
+  }),
+
+  http.get("*/api/orders/:id", ({ params, request }) => {
+    const orderId = String(params.id);
+    const ownerId = requestOwnerId(request);
+    const existing = Array.from(processedOrders.values()).find(
+      (entry) => entry.order.id === orderId && entry.ownerId === ownerId,
+    );
+    if (!existing) {
+      return HttpResponse.json({ message: "Pedido não encontrado." }, { status: 404 });
+    }
     return HttpResponse.json(existing.order);
   }),
 
@@ -193,7 +362,7 @@ export const handlers = [
           !Number.isInteger(item.nftId) ||
           !Number.isInteger(item.quantity) ||
           item.quantity < 1 ||
-          !nfts.some((nft) => nft.id === item.nftId),
+          !nfts.some((nft) => nft.id === item.nftId && nft.available !== false),
       )
     ) {
       return HttpResponse.json(
@@ -202,8 +371,10 @@ export const handlers = [
       );
     }
 
+    const ownerId = requestOwnerId(request);
     const normalizedPayload = normalizePayload(payload);
-    const existing = processedOrders.get(payload.idempotencyKey);
+    const storageKey = getOrderStorageKey(ownerId, payload.idempotencyKey);
+    const existing = processedOrders.get(storageKey);
 
     if (existing) {
       if (!hasSamePayload(existing.payload, normalizedPayload)) {
@@ -244,19 +415,28 @@ export const handlers = [
       );
     }
 
+    const isTestPendingOrder =
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("nova-art-test-pending-order") === "true";
+    if (isTestPendingOrder) {
+      localStorage.removeItem("nova-art-test-pending-order");
+    }
+
     const order: Order = {
       id: `ORD-${crypto.randomUUID()}`,
-      status: "confirmed",
+      status: isTestPendingOrder ? "pending" : "confirmed",
       items: normalizedPayload.items,
       subtotal,
       serviceFee,
       total,
       createdAt: new Date().toISOString(),
+      version: 1,
     };
 
-    processedOrders.set(payload.idempotencyKey, {
+    processedOrders.set(storageKey, {
       payload: normalizedPayload,
       order,
+      ownerId,
     });
     persistOrders();
 
@@ -272,3 +452,11 @@ export const handlers = [
     return HttpResponse.json(order, { status: 201 });
   }),
 ];
+
+function requestOwnerId(request: Request): string {
+  return request.headers.get("X-User-Id") ?? "anonymous";
+}
+
+function getOrderStorageKey(ownerId: string, idempotencyKey: string): string {
+  return `${ownerId}:${idempotencyKey}`;
+}

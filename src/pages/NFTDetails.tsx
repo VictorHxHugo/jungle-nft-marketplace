@@ -131,6 +131,7 @@ export default function NFTDetails() {
   }
 
   function addToCart() {
+    if (nft?.available === false) return;
     setCart((current) => {
       const existing = current.find((item) => item.id === id);
 
@@ -209,6 +210,12 @@ export default function NFTDetails() {
 
           <p className="mt-4 text-zinc-400">Categoria: {nft.category}</p>
 
+          {nft.available === false && (
+            <p role="status" className="mt-3 text-sm text-amber-300">
+              Este NFT está indisponível no momento.
+            </p>
+          )}
+
           <div className="mt-8 rounded-xl border border-white/10 bg-white/5 p-5">
             <p className="text-sm text-zinc-400">Preço atual</p>
             <p className="mt-2 text-3xl font-bold">
@@ -221,11 +228,14 @@ export default function NFTDetails() {
               type="button"
               className="flex-1 gap-2 bg-violet-500 text-white hover:bg-violet-600 disabled:bg-white/10 disabled:text-zinc-400"
               onClick={addToCart}
+              disabled={nft.available === false}
             >
               <ShoppingCart className="h-4 w-4" />
-              {isInCart
-                ? `Adicionar mais (${cartItem?.quantity ?? 0})`
-                : "Adicionar ao carrinho"}
+              {nft.available === false
+                ? "Indisponível"
+                : isInCart
+                  ? `Adicionar mais (${cartItem?.quantity ?? 0})`
+                  : "Adicionar ao carrinho"}
             </Button>
 
             <Button

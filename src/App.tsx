@@ -281,6 +281,9 @@ function App() {
   }
 
   function addToCart(id: number) {
+    const nft = nfts.find((currentNFT) => currentNFT.id === id);
+    if (!nft || nft.available === false) return;
+
     setCart((current) => {
       const existing = current.find((item) => item.id === id);
 
@@ -378,6 +381,12 @@ function App() {
                         {nft.collection}
                       </p>
 
+                      {nft.available === false && (
+                        <p className="mt-1 text-xs text-amber-300">
+                          Indisponível — remova para finalizar a compra.
+                        </p>
+                      )}
+
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <div className="flex items-center gap-2">
                           <Button
@@ -405,6 +414,7 @@ function App() {
                             aria-label={`Aumentar quantidade de ${nft.name}`}
                             className="h-7 w-7 border-white/15 bg-transparent"
                             onClick={() => updateCartQuantity(nft.id, 1)}
+                            disabled={nft.available === false}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -448,6 +458,7 @@ function App() {
                 <Button
                   type="button"
                   className="mt-5 w-full bg-violet-500 text-white hover:bg-violet-600"
+                  disabled={cartNFTs.some((nft) => nft.available === false)}
                   onClick={() => {
                     setCartOpen(false);
                     void navigate({ to: "/checkout" });
@@ -555,11 +566,12 @@ function App() {
           ) : (
             <Button
               type="button"
-              className="hidden bg-violet-500 text-white hover:bg-violet-600 sm:inline-flex"
+              className="bg-violet-500 px-3 text-white hover:bg-violet-600 sm:px-4"
+              aria-label="Entrar"
               onClick={() => void navigate({ to: "/login" })}
             >
               <UserRound className="mr-2 h-4 w-4" />
-              Entrar
+              <span className="hidden sm:inline">Entrar</span>
             </Button>
           )}
 
@@ -844,7 +856,11 @@ function App() {
 
                       <div className="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
                         <div>
-                          <p className="text-xs text-zinc-500">Preço atual</p>
+                          <p className="text-xs text-zinc-500">
+                            {nft.available === false
+                              ? "Indisponível"
+                              : "Preço atual"}
+                          </p>
 
                           <p className="mt-1 text-lg font-bold">
                             {nft.price.toFixed(2)}{" "}
@@ -857,12 +873,22 @@ function App() {
                         <Button
                           size="sm"
                           onClick={() => addToCart(nft.id)}
-                          disabled={cart.some((item) => item.id === nft.id)}
+                          disabled={
+                            nft.available === false ||
+                            cart.some((item) => item.id === nft.id)
+                          }
+                          aria-label={
+                            nft.available === false
+                              ? `${nft.name} indisponível`
+                              : undefined
+                          }
                           className="bg-violet-500 text-white hover:bg-violet-600 disabled:bg-white/10 disabled:text-zinc-400"
                         >
-                          {cart.some((item) => item.id === nft.id)
-                            ? "Adicionado"
-                            : "Adicionar"}
+                          {nft.available === false
+                            ? "Indisponível"
+                            : cart.some((item) => item.id === nft.id)
+                              ? "Adicionado"
+                              : "Adicionar"}
                         </Button>
                       </div>
                     </div>

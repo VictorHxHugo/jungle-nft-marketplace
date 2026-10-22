@@ -62,7 +62,7 @@ test("preserva a chave de idempotência ao recarregar o checkout", async ({
     page.getByRole("heading", { name: "Finalizar compra" }),
   ).toBeVisible();
 
-  const storageKey = "nova-art-checkout-idempotency";
+  const storageKey = "nova-art-checkout-idempotency:anonymous";
 
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), storageKey))
@@ -108,7 +108,7 @@ test("recupera o pedido após a resposta da criação se perder", async ({
     page.getByRole("heading", { name: "Finalizar compra" }),
   ).toBeVisible();
 
-  const storageKey = "nova-art-checkout-idempotency";
+  const storageKey = "nova-art-checkout-idempotency:anonymous";
 
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), storageKey))
