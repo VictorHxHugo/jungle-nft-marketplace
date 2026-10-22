@@ -101,8 +101,54 @@ export const handlers = [
     return HttpResponse.json(existing.order);
   }),
 
-  http.get("*/api/nfts", () => {
-    return HttpResponse.json(nfts);
+  http.get("*/api/nfts", ({ request }) => {
+    const url = new URL(request.url);
+    const hasCatalogParams = ["q", "category", "sort", "page"].some((key) =>
+      url.searchParams.has(key),
+    );
+
+    // Mantém a resposta antiga para chamadas sem parâmetros.
+    if (!hasCatalogParams) {
+      return HttpResponse.json(nfts);
+    }
+
+    const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    const category = url.searchParams.get("category") ?? "Todos";
+    const sort = url.searchParams.get("sort") ?? "featured";
+    const rawPage = Number(url.searchParams.get("page") ?? "1");
+    const page = Number.isFinite(rawPage)
+      ? Math.max(1, Math.floor(rawPage))
+      : 1;
+    const pageSize = 3;
+
+    const filtered = nfts
+      .filter((nft) => {
+        const matchesSearch = `${nft.name} ${nft.collection}`
+          .toLowerCase()
+          .includes(query);
+        const matchesCategory =
+          category === "Todos" || nft.category === category;
+
+        return matchesSearch && matchesCategory;
+      })
+      .sort((a, b) => {
+        if (sort === "low") return a.price - b.price;
+        if (sort === "high") return b.price - a.price;
+        return a.id - b.id;
+      });
+
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const start = (currentPage - 1) * pageSize;
+
+    return HttpResponse.json({
+      items: filtered.slice(start, start + pageSize),
+      total,
+      page: currentPage,
+      pageSize,
+      totalPages,
+    });
   }),
 
   http.get("*/api/nfts/:id", ({ params }) => {

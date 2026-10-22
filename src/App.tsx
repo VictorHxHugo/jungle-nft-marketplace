@@ -16,7 +16,8 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { getNFTs } from "@/services/nfts";
+import { getNFTCatalog, getNFTs } from "@/services/nfts";
+import type { NFTSort } from "@/services/nfts";
 import { categories } from "@/mocks/nfts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -155,7 +156,7 @@ function App() {
     });
   }
 
-  function updateSort(value: "featured" | "low" | "high") {
+  function updateSort(value: NFTSort) {
     void navigate({
       search: (previous) => ({
         ...previous,
@@ -179,42 +180,38 @@ function App() {
     });
   }
 
+  // Consulta completa, mantida para carregar itens que já estão no carrinho.
+  const { data: nfts = [], isLoading: isLoadingAllNFTs } = useQuery({
+    queryKey: ["nfts"],
+    queryFn: getNFTs,
+  });
+
+  // Garante que a ordenação recebida pela URL seja um NFTSort válido.
+  const catalogSort: NFTSort =
+    sort === "low" || sort === "high" ? sort : "featured";
+
+  // Busca, categoria, ordenação e paginação são enviadas à API.
   const {
-    data: nfts = [],
+    data: catalog,
     isLoading,
     isError,
     error,
     refetch,
   } = useQuery({
-    queryKey: ["nfts"],
-    queryFn: getNFTs,
+    queryKey: ["nftCatalog", search, category, catalogSort, page],
+    queryFn: () =>
+      getNFTCatalog({
+        q: search,
+        category,
+        sort: catalogSort,
+        page,
+      }),
   });
 
-  const filteredNFTs = nfts
-    .filter((nft) => {
-      const matchesSearch = `${nft.name} ${nft.collection}`
-        .toLowerCase()
-        .includes(search.trim().toLowerCase());
-
-      const matchesCategory = category === "Todos" || nft.category === category;
-
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      if (sort === "low") return a.price - b.price;
-      if (sort === "high") return b.price - a.price;
-      return a.id - b.id;
-    });
-
-  const pageSize = 3;
-  const totalPages = Math.max(1, Math.ceil(filteredNFTs.length / pageSize));
-
-  const currentPage = Math.max(1, Math.min(page, totalPages));
-
-  const paginatedNFTs = filteredNFTs.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
+  const totalPages = catalog?.totalPages ?? 1;
+  const currentPage = catalog?.page ?? page;
+  const paginatedNFTs = catalog?.items ?? [];
+  const totalNFTs = catalog?.total ?? 0;
 
   const cartNFTs = cart.flatMap((item) => {
     const nft = nfts.find((currentNFT) => currentNFT.id === item.id);
@@ -583,18 +580,18 @@ function App() {
                 className="border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
                 onClick={() =>
                   updateSort(
-                    sort === "low"
+                    catalogSort === "low"
                       ? "high"
-                      : sort === "high"
+                      : catalogSort === "high"
                         ? "featured"
                         : "low",
                   )
                 }
               >
                 <ArrowUpDown className="mr-2 h-4 w-4" />
-                {sort === "low"
+                {catalogSort === "low"
                   ? "Menor preço"
-                  : sort === "high"
+                  : catalogSort === "high"
                     ? "Maior preço"
                     : "Ordenar preço"}
               </Button>
@@ -634,7 +631,7 @@ function App() {
                 ? "Carregando catálogo..."
                 : isError
                   ? "Não foi possível carregar os NFTs"
-                  : `${filteredNFTs.length} itens encontrados`}
+                  : `${totalNFTs} itens encontrados`}
             </span>
 
             <span className="hidden sm:inline">Preços em ETH</span>
@@ -684,18 +681,18 @@ function App() {
                 Tentar novamente
               </Button>
             </div>
-          ) : filteredNFTs.length === 0 ? (
+          ) : paginatedNFTs.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-dashed border-white/15 px-6 py-16 text-center">
               <Search className="mx-auto h-8 w-8 text-zinc-500" />
 
               <h3 className="mt-4 font-semibold">
-                {nfts.length === 0
+                {!isLoadingAllNFTs && nfts.length === 0
                   ? "Nenhum NFT disponível"
                   : "Nenhum NFT encontrado"}
               </h3>
 
               <p className="mt-2 text-sm text-zinc-400">
-                {nfts.length === 0
+                {!isLoadingAllNFTs && nfts.length === 0
                   ? "O catálogo ainda não possui itens disponíveis."
                   : "Tente outra busca ou selecione uma categoria diferente."}
               </p>
