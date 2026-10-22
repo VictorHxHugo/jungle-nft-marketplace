@@ -1,75 +1,81 @@
-# React + TypeScript + Vite
+# Jungle NFT Marketplace
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Marketplace de NFTs desenvolvido com React, TypeScript e Vite, com foco em experiência de usuário, integração REST simulada e confiabilidade do checkout.
 
-Currently, two official plugins are available:
+## Funcionalidades
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Catálogo com busca, categorias, ordenação por preço e paginação via API simulada.
+- Detalhes de NFTs e tratamento para itens inexistentes.
+- Favoritos e carrinho persistidos no navegador.
+- Checkout simulado com idempotência e recuperação de pedidos.
+- Interface responsiva para desktop e dispositivos móveis.
+- Testes unitários e end-to-end.
 
-## React Compiler
+## Tecnologias
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React e TypeScript
+- Vite
+- TanStack Router e TanStack Query
+- Axios
+- Tailwind CSS e shadcn/ui
+- Mock Service Worker (MSW)
+- Vitest e Testing Library
+- Playwright
+- Socket.IO Client
 
-## Expanding the ESLint configuration
+## Instalação
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Requisitos: Node.js compatível com a versão do Vite instalada e npm.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+git clone https://github.com/VictorHxHugo/jungle-nft-marketplace.git
+cd jungle-nft-marketplace
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Scripts
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Comando                   | Descrição                            |
+| ------------------------- | ------------------------------------ |
+| `npm run dev`             | Inicia o servidor de desenvolvimento |
+| `npm run build`           | Verifica os tipos e gera a build     |
+| `npm run preview`         | Executa a build localmente           |
+| `npm run lint`            | Executa o ESLint                     |
+| `npm run test`            | Executa os testes unitários          |
+| `npm run test:e2e`        | Executa os testes com Playwright     |
+| `npm run test:e2e:report` | Abre o relatório do Playwright       |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Arquitetura
 
-```
+- `src/`: aplicação, páginas, componentes, serviços e tipos.
+- `src/services/`: cliente HTTP e funções de acesso à API.
+- `src/mocks/`: handlers e dados da API simulada.
+- `e2e/`: testes end-to-end.
+- `public/`: arquivos estáticos e service worker do MSW.
+
+O TanStack Query gerencia o cache das consultas. O catálogo envia parâmetros de busca, categoria, ordenação e paginação ao serviço de dados.
+
+## API simulada
+
+O MSW intercepta requisições durante o desenvolvimento e os testes. O checkout é demonstrativo: o projeto não realiza transações reais em blockchain nem pagamentos.
+
+Por padrão, o cliente HTTP utiliza `/api`. A variável `VITE_API_URL` permite configurar outro endereço para um backend compatível.
+
+A variável `VITE_ENABLE_MOCKS=true` habilita os mocks também fora do ambiente de desenvolvimento. Use-a somente quando desejar demonstrar a aplicação com dados simulados.
+
+## Deploy na Vercel
+
+O repositório inclui `vercel.json` com rewrite para a aplicação React.
+
+1. Importe o repositório na Vercel.
+2. Configure `npm run build` como comando de build.
+3. Configure `dist` como diretório de saída.
+4. Configure `VITE_API_URL` se utilizar um backend externo.
+5. Para uma demonstração com dados simulados, configure `VITE_ENABLE_MOCKS=true`.
+
+O deploy com MSW é uma demonstração de frontend, não substitui um backend real para produção.
+
+## Licença
+
+Projeto desenvolvido para fins de demonstração e avaliação técnica.
