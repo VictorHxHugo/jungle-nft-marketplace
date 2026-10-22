@@ -104,3 +104,29 @@ test("mantém o carrinho após recarregar a página", async ({ page }) => {
   const reloadedCartDialog = page.getByRole("dialog");
   await expect(reloadedCartDialog.getByText("Cosmic Dreamer")).toBeVisible();
 });
+
+test("abre os detalhes de um NFT", async ({ page }) => {
+  await page
+    .getByRole("link", {
+      name: "Ver detalhes de Cosmic Dreamer",
+    })
+    .click();
+
+  await expect(page).toHaveURL(/\/nft\/1$/);
+  await expect(
+    page.getByRole("heading", { name: "Cosmic Dreamer" }),
+  ).toBeVisible();
+  await expect(page.getByText("Beyond the Stars")).toBeVisible();
+});
+
+test("exibe tratamento para NFT inexistente", async ({ page }) => {
+  await page.goto("/nft/99999");
+
+  await expect(
+    page.getByText(/não foi possível encontrar esse NFT/i),
+  ).toBeVisible();
+
+  await expect(
+    page.getByRole("link", { name: /voltar ao catálogo/i }),
+  ).toBeVisible();
+});
