@@ -2,22 +2,25 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { CartItem } from "@/types/cart";
+import type { User } from "@/types/auth";
 import {
   Search,
   ShoppingBag,
   Heart,
   SlidersHorizontal,
   ArrowUpDown,
-  Wallet,
   Sparkles,
   Menu,
   Trash2,
   ShoppingCart,
   Plus,
   Minus,
+  UserRound,
+  LogOut,
 } from "lucide-react";
 import { getNFTCatalog, getNFTs } from "@/services/nfts";
 import type { NFTSort } from "@/services/nfts";
+import { logout } from "@/services/auth";
 import { categories } from "@/mocks/nfts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,8 +102,39 @@ function getStoredCart(): CartItem[] {
   }
 }
 
+function getStoredUser(): User | null {
+  try {
+    const token = localStorage.getItem("nova-art-token");
+    const storedUser = localStorage.getItem("nova-art-user");
+
+    if (!token || !storedUser) return null;
+
+    const parsed: unknown = JSON.parse(storedUser);
+
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "id" in parsed &&
+      "name" in parsed &&
+      "email" in parsed &&
+      typeof parsed.id === "string" &&
+      typeof parsed.name === "string" &&
+      typeof parsed.email === "string"
+    ) {
+      return parsed as User;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function App() {
   const navigate = useNavigate({ from: "/" });
+
+  const [currentUser, setCurrentUser] = useState<User | null>(getStoredUser);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const {
     q: search,
@@ -133,6 +167,21 @@ function App() {
       console.error("Não foi possível salvar o carrinho.");
     }
   }, [cart]);
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+
+    try {
+      await logout();
+    } catch {
+      // A sessão local também será encerrada se a API falhar.
+    } finally {
+      localStorage.removeItem("nova-art-token");
+      localStorage.removeItem("nova-art-user");
+      setCurrentUser(null);
+      setIsLoggingOut(false);
+    }
+  }
 
   function updateSearch(value: string) {
     void navigate({
@@ -180,17 +229,14 @@ function App() {
     });
   }
 
-  // Consulta completa, mantida para carregar itens que já estão no carrinho.
   const { data: nfts = [], isLoading: isLoadingAllNFTs } = useQuery({
     queryKey: ["nfts"],
     queryFn: getNFTs,
   });
 
-  // Garante que a ordenação recebida pela URL seja um NFTSort válido.
   const catalogSort: NFTSort =
     sort === "low" || sort === "high" ? sort : "featured";
 
-  // Busca, categoria, ordenação e paginação são enviadas à API.
   const {
     data: catalog,
     isLoading,
@@ -485,18 +531,37 @@ function App() {
             )}
           </Button>
 
-          <Button
-            type="button"
-            className="hidden bg-violet-500 text-white hover:bg-violet-600 sm:inline-flex"
-            onClick={() =>
-              window.alert(
-                "A conexão com a carteira será implementada na próxima etapa.",
-              )
-            }
-          >
-            <Wallet className="mr-2 h-4 w-4" />
-            Conectar carteira
-          </Button>
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <span
+                className="hidden max-w-32 items-center truncate text-sm text-white/80 sm:inline-flex"
+                title={currentUser.email}
+              >
+                <UserRound className="mr-1 h-4 w-4 shrink-0" />
+                <span className="truncate">{currentUser.name}</span>
+              </span>
+
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoggingOut}
+                className="border-white/15 bg-transparent text-white hover:bg-white/10"
+                onClick={() => void handleLogout()}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                {isLoggingOut ? "Saindo..." : "Sair"}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              className="hidden bg-violet-500 text-white hover:bg-violet-600 sm:inline-flex"
+              onClick={() => void navigate({ to: "/login" })}
+            >
+              <UserRound className="mr-2 h-4 w-4" />
+              Entrar
+            </Button>
+          )}
 
           <Button
             type="button"
