@@ -65,3 +65,42 @@ test("filtra NFTs por categoria", async ({ page }) => {
     }),
   ).toHaveCount(0);
 });
+
+test("mantém os favoritos após recarregar a página", async ({ page }) => {
+  await page
+    .getByRole("button", { name: "Adicionar Cosmic Dreamer aos favoritos" })
+    .click();
+
+  await expect(
+    page.getByRole("button", {
+      name: "Remover Cosmic Dreamer dos favoritos",
+    }),
+  ).toBeVisible();
+
+  await page.reload();
+
+  await expect(
+    page.getByRole("button", {
+      name: "Remover Cosmic Dreamer dos favoritos",
+    }),
+  ).toBeVisible();
+});
+
+test("mantém o carrinho após recarregar a página", async ({ page }) => {
+  await page
+    .getByRole("button", { name: "Adicionar", exact: true })
+    .first()
+    .click();
+
+  await page.getByRole("button", { name: /^Carrinho,/ }).click();
+
+  const cartDialog = page.getByRole("dialog");
+  await expect(cartDialog.getByText("Cosmic Dreamer")).toBeVisible();
+
+  await page.reload();
+
+  await page.getByRole("button", { name: /^Carrinho,/ }).click();
+
+  const reloadedCartDialog = page.getByRole("dialog");
+  await expect(reloadedCartDialog.getByText("Cosmic Dreamer")).toBeVisible();
+});
