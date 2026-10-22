@@ -1,21 +1,51 @@
 import { http, HttpResponse } from "msw";
 import { nfts } from "./nfts";
-import type { CreateOrderPayload } from "@/types/order";
+import type { CreateOrderPayload, Order } from "@/types/order";
 
-const processedOrders = new Map<string, object>();
+type ProcessedOrder = {
+  payload: CreateOrderPayload;
+  order: Order;
+};
+
+const processedOrders = new Map<string, ProcessedOrder>();
+
+function normalizePayload(payload: CreateOrderPayload): CreateOrderPayload {
+  return {
+    items: [...payload.items]
+      .map((item) => ({
+        nftId: item.nftId,
+        quantity: item.quantity,
+      }))
+      .sort((a, b) => a.nftId - b.nftId),
+    subtotal: payload.subtotal,
+    serviceFee: payload.serviceFee,
+    total: payload.total,
+    idempotencyKey: payload.idempotencyKey,
+  };
+}
+
+function hasSamePayload(
+  first: CreateOrderPayload,
+  second: CreateOrderPayload,
+): boolean {
+  return (
+    JSON.stringify(normalizePayload(first)) ===
+    JSON.stringify(normalizePayload(second))
+  );
+}
 
 export const handlers = [
-  http.get("/api/nfts", () => {
+  http.get("*/api/nfts", () => {
     return HttpResponse.json(nfts);
   }),
 
-  http.get("/api/nfts/:id", ({ params }) => {
+  http.get("*/api/nfts/:id", ({ params }) => {
     const id = Number(params.id);
     const nft = nfts.find((item) => item.id === id);
 
     if (!nft) {
       return HttpResponse.json(
-        { message: "NFT não encontrado" },
+        { message: "NFT não encontrado." },
         { status: 404 },
       );
     }
@@ -23,7 +53,7 @@ export const handlers = [
     return HttpResponse.json(nft);
   }),
 
-  http.post("/api/orders", async ({ request }) => {
+  http.post("*/api/orders", async ({ request }) => {
     let payload: CreateOrderPayload;
 
     try {
@@ -37,15 +67,17 @@ export const handlers = [
 
     if (
       !payload ||
+      typeof payload !== "object" ||
       !Array.isArray(payload.items) ||
       payload.items.length === 0 ||
       typeof payload.idempotencyKey !== "string" ||
-      !payload.idempotencyKey ||
+      payload.idempotencyKey.trim().length === 0 ||
       !Number.isFinite(payload.subtotal) ||
       !Number.isFinite(payload.serviceFee) ||
       !Number.isFinite(payload.total) ||
       payload.items.some(
         (item) =>
+          !item ||
           !Number.isInteger(item.nftId) ||
           !Number.isInteger(item.quantity) ||
           item.quantity < 1 ||
@@ -58,16 +90,28 @@ export const handlers = [
       );
     }
 
+    const normalizedPayload = normalizePayload(payload);
     const existing = processedOrders.get(payload.idempotencyKey);
 
     if (existing) {
-      return HttpResponse.json(existing);
+      if (!hasSamePayload(existing.payload, normalizedPayload)) {
+        return HttpResponse.json(
+          {
+            message:
+              "Esta chave de idempotência já foi utilizada em outro pedido.",
+          },
+          { status: 409 },
+        );
+      }
+
+      return HttpResponse.json(existing.order);
     }
 
     const subtotal = Number(
       payload.items
         .reduce((sum, item) => {
           const nft = nfts.find((current) => current.id === item.nftId)!;
+
           return sum + nft.price * item.quantity;
         }, 0)
         .toFixed(2),
@@ -82,22 +126,27 @@ export const handlers = [
       Math.abs(payload.total - total) > 0.001
     ) {
       return HttpResponse.json(
-        { message: "Os valores do pedido foram alterados. Revise o carrinho." },
+        {
+          message: "Os valores do pedido foram alterados. Revise o carrinho.",
+        },
         { status: 409 },
       );
     }
 
-    const order = {
-      id: `ORD-${Date.now()}`,
-      status: "confirmed" as const,
-      items: payload.items,
+    const order: Order = {
+      id: `ORD-${crypto.randomUUID()}`,
+      status: "confirmed",
+      items: normalizedPayload.items,
       subtotal,
       serviceFee,
       total,
       createdAt: new Date().toISOString(),
     };
 
-    processedOrders.set(payload.idempotencyKey, order);
+    processedOrders.set(payload.idempotencyKey, {
+      payload: normalizedPayload,
+      order,
+    });
 
     return HttpResponse.json(order, { status: 201 });
   }),
