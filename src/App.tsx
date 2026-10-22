@@ -403,15 +403,14 @@ function App() {
                 </p>
 
                 <Button
+                  type="button"
                   className="mt-5 w-full bg-violet-500 text-white hover:bg-violet-600"
                   onClick={() => {
                     setCartOpen(false);
-                    window.alert(
-                      "O checkout será implementado na próxima etapa.",
-                    );
+                    void navigate({ to: "/checkout" });
                   }}
                 >
-                  Continuar comprando
+                  Finalizar compra
                 </Button>
               </div>
             </>
